@@ -74,6 +74,32 @@ fn test_memory_ttl_lazy_expiry() {
 }
 
 #[test]
+fn test_memory_fts_search() {
+    let conn = setup();
+    tools::memory::set(
+        &serde_json::json!({"namespace": "docs", "key": "rust-guide", "value": "Rust is a systems programming language focused on safety"}),
+        &conn,
+    );
+    tools::memory::set(
+        &serde_json::json!({"namespace": "docs", "key": "python-guide", "value": "Python is an interpreted high-level language"}),
+        &conn,
+    );
+    tools::memory::set(
+        &serde_json::json!({"namespace": "docs", "key": "rust-async", "value": "Async programming in Rust uses futures and tokio runtime"}),
+        &conn,
+    );
+    let result = tools::memory::search(
+        &serde_json::json!({"query": "rust programming"}),
+        &conn,
+    );
+    assert!(result.ok);
+    let data = result.data.unwrap();
+    let matches = data["matches"].as_array().unwrap();
+    assert!(matches.len() >= 2);
+    assert!(matches[0].get("rank").is_some());
+}
+
+#[test]
 fn test_memory_set_upsert() {
     let conn = setup();
     tools::memory::set(&serde_json::json!({"namespace": "ns", "key": "k", "value": "v1"}), &conn);

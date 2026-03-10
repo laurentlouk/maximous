@@ -41,15 +41,16 @@ pub fn read(args: &Value, conn: &Connection) -> ToolResult {
     };
     let unacked_only = args["unacknowledged_only"].as_bool().unwrap_or(false);
     let limit = args["limit"].as_i64().unwrap_or(50);
+    let offset = args["offset"].as_i64().unwrap_or(0);
 
     let sql = if unacked_only {
         "SELECT id, channel, sender, priority, content, acknowledged, created_at
          FROM messages WHERE channel = ?1 AND acknowledged = 0
-         ORDER BY priority ASC, created_at ASC LIMIT ?2"
+         ORDER BY priority ASC, created_at ASC LIMIT ?2 OFFSET ?3"
     } else {
         "SELECT id, channel, sender, priority, content, acknowledged, created_at
          FROM messages WHERE channel = ?1
-         ORDER BY priority ASC, created_at ASC LIMIT ?2"
+         ORDER BY priority ASC, created_at ASC LIMIT ?2 OFFSET ?3"
     };
 
     let mut stmt = match conn.prepare(sql) {
@@ -57,7 +58,7 @@ pub fn read(args: &Value, conn: &Connection) -> ToolResult {
         Err(e) => return ToolResult::fail(&format!("db error: {}", e)),
     };
     let messages: Vec<Value> = stmt
-        .query_map(rusqlite::params![channel, limit], |row| {
+        .query_map(rusqlite::params![channel, limit, offset], |row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, i64>(0)?,
                 "channel": row.get::<_, String>(1)?,
@@ -73,7 +74,7 @@ pub fn read(args: &Value, conn: &Connection) -> ToolResult {
         .collect();
 
     let count = messages.len();
-    ToolResult::success(serde_json::json!({"messages": messages, "count": count}))
+    ToolResult::success(serde_json::json!({"messages": messages, "count": count, "offset": offset}))
 }
 
 pub fn ack(args: &Value, conn: &Connection) -> ToolResult {

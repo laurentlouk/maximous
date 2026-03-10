@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS memory (
     key TEXT NOT NULL,
     value TEXT NOT NULL,
     ttl_seconds INTEGER,
+    observation_type TEXT,
+    category TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     PRIMARY KEY (namespace, key)
@@ -164,4 +166,63 @@ BEGIN
     VALUES ('agents', OLD.id, 'delete',
             json_object('name', OLD.name),
             strftime('%s', 'now'));
+END;
+
+-- Session tracking
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    summary TEXT,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+
+CREATE TRIGGER IF NOT EXISTS trg_sessions_insert AFTER INSERT ON sessions
+BEGIN
+    INSERT INTO changes (table_name, row_id, action, summary, created_at)
+    VALUES ('sessions', NEW.id, 'insert',
+            json_object('agent_id', NEW.agent_id, 'status', NEW.status),
+            strftime('%s', 'now'));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_sessions_update AFTER UPDATE ON sessions
+BEGIN
+    INSERT INTO changes (table_name, row_id, action, summary, created_at)
+    VALUES ('sessions', NEW.id, 'update',
+            json_object('agent_id', NEW.agent_id, 'status', NEW.status),
+            strftime('%s', 'now'));
+END;
+
+-- FTS5 full-text search for memory values
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
+    namespace,
+    key,
+    value,
+    content='memory',
+    content_rowid='rowid'
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_memory_fts_insert AFTER INSERT ON memory
+BEGIN
+    INSERT INTO memory_fts(rowid, namespace, key, value)
+    VALUES (NEW.rowid, NEW.namespace, NEW.key, NEW.value);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_memory_fts_update AFTER UPDATE ON memory
+BEGIN
+    INSERT INTO memory_fts(memory_fts, rowid, namespace, key, value)
+    VALUES ('delete', OLD.rowid, OLD.namespace, OLD.key, OLD.value);
+    INSERT INTO memory_fts(rowid, namespace, key, value)
+    VALUES (NEW.rowid, NEW.namespace, NEW.key, NEW.value);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_memory_fts_delete AFTER DELETE ON memory
+BEGIN
+    INSERT INTO memory_fts(memory_fts, rowid, namespace, key, value)
+    VALUES ('delete', OLD.rowid, OLD.namespace, OLD.key, OLD.value);
 END;

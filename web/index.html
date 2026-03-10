@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>maximous dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav id="sidebar">
+        <div class="logo">
+            <h1>maximous</h1>
+            <span class="version">v0.2.0</span>
+        </div>
+        <ul>
+            <li><a href="#" data-page="overview" class="active">Overview</a></li>
+            <li><a href="#" data-page="agents">Agents</a></li>
+            <li><a href="#" data-page="tasks">Tasks</a></li>
+            <li><a href="#" data-page="messages">Messages</a></li>
+            <li><a href="#" data-page="memory">Memory</a></li>
+            <li><a href="#" data-page="sessions">Sessions</a></li>
+            <li><a href="#" data-page="activity">Activity</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div id="connection-status" class="status-dot connected"></div>
+            <span>Connected</span>
+        </div>
+    </nav>
+    <main id="content">
+        <div id="page-overview" class="page active"></div>
+        <div id="page-agents" class="page"></div>
+        <div id="page-tasks" class="page"></div>
+        <div id="page-messages" class="page"></div>
+        <div id="page-memory" class="page"></div>
+        <div id="page-sessions" class="page"></div>
+        <div id="page-activity" class="page"></div>
+    </main>
+    <script src="/app.js"></script>
+</body>
+</html>

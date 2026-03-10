@@ -43,5 +43,9 @@ fn test_tool_list_contains_all_tools() {
     assert!(names.contains(&"agent_heartbeat"));
     assert!(names.contains(&"agent_list"));
     assert!(names.contains(&"poll_changes"));
-    assert_eq!(tools.len(), 14);
+    assert!(names.contains(&"memory_search_index"));
+    assert!(names.contains(&"session_start"));
+    assert!(names.contains(&"session_end"));
+    assert!(names.contains(&"session_list"));
+    assert_eq!(tools.len(), 18);
 }

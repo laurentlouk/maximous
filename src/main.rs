@@ -1,6 +1,7 @@
 mod db;
 mod mcp;
 mod tools;
+mod web;
 
 use clap::Parser;
 use std::sync::{Arc, Mutex};
@@ -11,6 +12,14 @@ struct Cli {
     /// Path to the SQLite database file
     #[arg(long, default_value = ".maximous/brain.db")]
     db: String,
+
+    /// Enable web dashboard
+    #[arg(long)]
+    web: bool,
+
+    /// Web dashboard port
+    #[arg(long, default_value = "8375")]
+    port: u16,
 }
 
 fn main() {
@@ -19,5 +28,11 @@ fn main() {
     eprintln!("maximous: database ready at {}", cli.db);
 
     let conn = Arc::new(Mutex::new(conn));
-    mcp::run_stdio(conn);
+
+    if cli.web {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(web::serve(conn, cli.port));
+    } else {
+        mcp::run_stdio(conn);
+    }
 }

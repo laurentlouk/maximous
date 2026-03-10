@@ -75,7 +75,9 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                     "namespace": {"type": "string", "description": "Memory namespace"},
                     "key": {"type": "string", "description": "Key within namespace"},
                     "value": {"type": "string", "description": "JSON string value to store"},
-                    "ttl_seconds": {"type": "integer", "description": "Optional TTL in seconds"}
+                    "ttl_seconds": {"type": "integer", "description": "Optional TTL in seconds"},
+                    "observation_type": {"type": "string", "description": "Type: decision, error, preference, insight, pattern, learning"},
+                    "category": {"type": "string", "description": "Category: architecture, debugging, workflow, api, ui, data, config"}
                 },
                 "required": ["namespace", "key", "value"]
             }),
@@ -94,12 +96,30 @@ pub fn tool_definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "memory_search".into(),
-            description: "Full-text search across memory values".into(),
+            description: "Full-text search across memory values using FTS5 ranking".into(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query (matches against values)"},
-                    "namespace": {"type": "string", "description": "Optional namespace filter"}
+                    "query": {"type": "string", "description": "Search query with FTS5 syntax support (e.g. 'rust AND async', 'programming OR language')"},
+                    "namespace": {"type": "string", "description": "Optional namespace filter"},
+                    "limit": {"type": "integer", "description": "Max results to return", "default": 50},
+                    "offset": {"type": "integer", "description": "Offset for pagination", "default": 0},
+                    "observation_type": {"type": "string", "description": "Filter by observation type"}
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolDef {
+            name: "memory_search_index".into(),
+            description: "Search memory returning compact index (snippet + token estimate). Use memory_get to fetch full values. 10x more token-efficient than memory_search.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query (FTS5 syntax supported)"},
+                    "namespace": {"type": "string", "description": "Optional namespace filter"},
+                    "observation_type": {"type": "string", "description": "Filter by observation type"},
+                    "limit": {"type": "integer", "description": "Max results", "default": 20},
+                    "offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
                 },
                 "required": ["query"]
             }),
@@ -138,7 +158,8 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                 "properties": {
                     "channel": {"type": "string", "description": "Channel to read from"},
                     "unacknowledged_only": {"type": "boolean", "description": "Only return unacknowledged messages", "default": false},
-                    "limit": {"type": "integer", "description": "Max messages to return", "default": 50}
+                    "limit": {"type": "integer", "description": "Max messages to return", "default": 50},
+                    "offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
                 },
                 "required": ["channel"]
             }),
@@ -192,7 +213,9 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                 "type": "object",
                 "properties": {
                     "status": {"type": "string", "description": "Filter by status"},
-                    "assigned_to": {"type": "string", "description": "Filter by assigned agent"}
+                    "assigned_to": {"type": "string", "description": "Filter by assigned agent"},
+                    "limit": {"type": "integer", "description": "Max results to return", "default": 100},
+                    "offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
                 }
             }),
         },
@@ -232,7 +255,9 @@ pub fn tool_definitions() -> Vec<ToolDef> {
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "include_stale": {"type": "boolean", "description": "Include agents with old heartbeats", "default": false}
+                    "include_stale": {"type": "boolean", "description": "Include agents with old heartbeats", "default": false},
+                    "limit": {"type": "integer", "description": "Max results to return", "default": 100},
+                    "offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
                 }
             }),
         },
@@ -245,6 +270,42 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                     "since_id": {"type": "integer", "description": "Return changes with ID greater than this", "default": 0},
                     "table_name": {"type": "string", "description": "Optional filter by table name"},
                     "limit": {"type": "integer", "description": "Max changes to return", "default": 100}
+                }
+            }),
+        },
+        ToolDef {
+            name: "session_start".into(),
+            description: "Start a new session for tracking agent work".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Agent starting the session"},
+                    "metadata": {"type": "string", "description": "Optional JSON metadata about the session"}
+                }
+            }),
+        },
+        ToolDef {
+            name: "session_end".into(),
+            description: "End a session with optional summary".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "Session ID to end"},
+                    "summary": {"type": "string", "description": "Summary of what was accomplished"}
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDef {
+            name: "session_list".into(),
+            description: "List sessions filtered by agent or status".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Filter by agent"},
+                    "status": {"type": "string", "description": "Filter by status (active, ended)"},
+                    "limit": {"type": "integer", "description": "Max results", "default": 50},
+                    "offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
                 }
             }),
         },

@@ -65,18 +65,20 @@ pub fn heartbeat(args: &Value, conn: &Connection) -> ToolResult {
 
 pub fn list(args: &Value, conn: &Connection) -> ToolResult {
     let include_stale = args["include_stale"].as_bool().unwrap_or(false);
+    let limit = args["limit"].as_i64().unwrap_or(100);
+    let offset = args["offset"].as_i64().unwrap_or(0);
 
     let sql = if include_stale {
-        "SELECT id, name, status, capabilities, metadata, last_heartbeat FROM agents ORDER BY name"
+        "SELECT id, name, status, capabilities, metadata, last_heartbeat FROM agents ORDER BY name LIMIT ?1 OFFSET ?2".to_string()
     } else {
-        "SELECT id, name, status, capabilities, metadata, last_heartbeat FROM agents WHERE last_heartbeat > ?1 ORDER BY name"
+        "SELECT id, name, status, capabilities, metadata, last_heartbeat FROM agents WHERE last_heartbeat > ?1 ORDER BY name LIMIT ?2 OFFSET ?3".to_string()
     };
 
     let cutoff = now() - 60;
 
     let agents: Vec<Value> = if include_stale {
-        let mut stmt = conn.prepare(sql).unwrap();
-        stmt.query_map([], |row| {
+        let mut stmt = conn.prepare(&sql).unwrap();
+        stmt.query_map(rusqlite::params![limit, offset], |row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "name": row.get::<_, String>(1)?,
@@ -90,8 +92,8 @@ pub fn list(args: &Value, conn: &Connection) -> ToolResult {
         .filter_map(|r| r.ok())
         .collect()
     } else {
-        let mut stmt = conn.prepare(sql).unwrap();
-        stmt.query_map(rusqlite::params![cutoff], |row| {
+        let mut stmt = conn.prepare(&sql).unwrap();
+        stmt.query_map(rusqlite::params![cutoff, limit, offset], |row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "name": row.get::<_, String>(1)?,
@@ -106,5 +108,5 @@ pub fn list(args: &Value, conn: &Connection) -> ToolResult {
         .collect()
     };
 
-    ToolResult::success(serde_json::json!({"agents": agents, "count": agents.len()}))
+    ToolResult::success(serde_json::json!({"agents": agents, "count": agents.len(), "limit": limit, "offset": offset}))
 }

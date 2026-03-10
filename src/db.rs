@@ -14,6 +14,22 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     // Run schema
     conn.execute_batch(SCHEMA)?;
 
+    // Run migrations for existing databases
+    migrate(conn)?;
+
+    Ok(())
+}
+
+fn migrate(conn: &Connection) -> Result<()> {
+    let has_obs_type: bool = conn
+        .prepare("SELECT observation_type FROM memory LIMIT 0")
+        .is_ok();
+    if !has_obs_type {
+        conn.execute_batch(
+            "ALTER TABLE memory ADD COLUMN observation_type TEXT;
+             ALTER TABLE memory ADD COLUMN category TEXT;",
+        )?;
+    }
     Ok(())
 }
 

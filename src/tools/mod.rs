@@ -3,6 +3,7 @@ pub mod messages;
 pub mod tasks;
 pub mod agents;
 pub mod changes;
+pub mod sessions;
 
 use rusqlite::Connection;
 use serde_json::Value;
@@ -31,6 +32,7 @@ pub fn dispatch_tool(name: &str, args: &Value, conn: &Connection) -> ToolResult 
         "memory_set" => memory::set(args, conn),
         "memory_get" => memory::get(args, conn),
         "memory_search" => memory::search(args, conn),
+        "memory_search_index" => memory::search_index(args, conn),
         "memory_delete" => memory::delete(args, conn),
         "message_send" => messages::send(args, conn),
         "message_read" => messages::read(args, conn),
@@ -42,6 +44,9 @@ pub fn dispatch_tool(name: &str, args: &Value, conn: &Connection) -> ToolResult 
         "agent_heartbeat" => agents::heartbeat(args, conn),
         "agent_list" => agents::list(args, conn),
         "poll_changes" => changes::poll(args, conn),
+        "session_start" => sessions::start(args, conn),
+        "session_end" => sessions::end(args, conn),
+        "session_list" => sessions::list(args, conn),
         _ => ToolResult::fail(&format!("Unknown tool: {}", name)),
     }
 }

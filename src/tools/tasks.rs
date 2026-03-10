@@ -130,11 +130,17 @@ pub fn list(args: &Value, conn: &Connection) -> ToolResult {
         format!("WHERE {}", conditions.join(" AND "))
     };
 
+    let limit = args["limit"].as_i64().unwrap_or(100);
+    let offset = args["offset"].as_i64().unwrap_or(0);
+
     let sql = format!(
         "SELECT id, title, status, priority, assigned_to, dependencies, result, created_at, updated_at
-         FROM tasks {} ORDER BY priority ASC, created_at ASC",
+         FROM tasks {} ORDER BY priority ASC, created_at ASC LIMIT ? OFFSET ?",
         where_clause
     );
+
+    params.push(Box::new(limit));
+    params.push(Box::new(offset));
 
     let params_ref: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
     let mut stmt = match conn.prepare(&sql) {
@@ -160,5 +166,5 @@ pub fn list(args: &Value, conn: &Connection) -> ToolResult {
         .collect();
 
     let count = tasks.len();
-    ToolResult::success(serde_json::json!({"tasks": tasks, "count": count}))
+    ToolResult::success(serde_json::json!({"tasks": tasks, "count": count, "limit": limit, "offset": offset}))
 }
