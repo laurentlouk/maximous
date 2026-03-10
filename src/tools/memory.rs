@@ -71,7 +71,8 @@ pub fn get(args: &Value, conn: &Connection) -> ToolResult {
 
     match args["key"].as_str() {
         Some(key) => {
-            let result: Result<(String, Option<i64>, i64, Option<String>, Option<String>), _> = conn.query_row(
+            type MemRow = (String, Option<i64>, i64, Option<String>, Option<String>);
+            let result: Result<MemRow, _> = conn.query_row(
                 "SELECT value, ttl_seconds, updated_at, observation_type, category FROM memory WHERE namespace = ?1 AND key = ?2",
                 rusqlite::params![namespace, key],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),

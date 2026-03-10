@@ -1,7 +1,7 @@
 {
   "name": "maximous",
-  "version": "0.1.1",
-  "description": "Lightweight SQLite brain for multi-agent orchestration — shared memory, messaging, task coordination, and observation for Claude Code agents",
+  "version": "0.2.0",
+  "description": "SQLite brain for multi-agent orchestration — FTS5 search, typed observations, progressive disclosure, privacy tags, session tracking, web dashboard, and real-time SSE updates",
   "author": {
     "name": "Laurent",
     "url": "https://github.com/laurentlouk/maximous"

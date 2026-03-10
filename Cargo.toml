@@ -1,8 +1,8 @@
 [package]
 name = "maximous"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
-description = "Lightweight SQLite brain for multi-agent orchestration"
+description = "SQLite brain for multi-agent orchestration — FTS5 search, typed observations, progressive disclosure, session tracking, and web dashboard"
 license = "MIT"
 
 [dependencies]
