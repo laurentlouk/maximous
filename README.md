@@ -79,17 +79,32 @@ If you just want the MCP server without the full plugin, add to your project's `
 
 ## Usage
 
-Claude Code auto-spawns the MCP server and makes all 14 tools available to agents. The plugin also includes 7 skills that teach agents how to use maximous effectively:
+Claude Code auto-spawns the MCP server and makes all 14 tools available to agents. The SessionStart hook runs automatically every session to ensure the binary and `.maximous/` directory exist.
 
-| Skill | Purpose |
-|---|---|
-| **orchestrate** | Set up full multi-agent workflows |
-| **coordinate** | Task lifecycle and dependency management |
-| **communicate** | Message channels and priority queues |
-| **memory** | Shared key-value storage with TTL |
-| **observe** | Watch for state changes via polling |
-| **status** | Quick overview of current state |
-| **cleanup** | Expire stale data and maintain the database |
+### Skills
+
+The plugin includes 7 skills that teach agents how to use maximous. Skills trigger automatically based on what you say:
+
+| Skill | Trigger examples | Purpose |
+|---|---|---|
+| **orchestrate** | "orchestrate agents", "set up multi-agent workflow" | Set up full multi-agent workflows |
+| **coordinate** | "manage tasks", "create task graph" | Task lifecycle and dependency management |
+| **communicate** | "send a message to agents", "use message channels" | Message channels and priority queues |
+| **memory** | "store this in memory", "share data between agents" | Shared key-value storage with TTL |
+| **observe** | "watch for changes", "poll for updates" | Watch for state changes via polling |
+| **status** | "maximous status", "show agent status" | Quick overview of current state |
+| **cleanup** | "clean up maximous", "expire old data" | Expire stale data and maintain the database |
+
+### When Does Maximous Activate?
+
+Maximous tools are available in every session but Claude only uses them when there's a reason to. In practice, maximous becomes useful when you:
+
+- **Run parallel subagents** that need to share data
+- **Set up task graphs** with dependencies between agents
+- **Need agents to communicate** with each other via message channels
+- **Want to observe** when another agent finishes a task
+
+For a single-agent session (just you and Claude), there's typically no need — it kicks in when you're doing multi-agent work, like *"orchestrate 3 agents to build this feature in parallel."*
 
 ### Standalone
 
