@@ -1,3 +1,5 @@
+mod db;
+
 use clap::Parser;
 
 #[derive(Parser)]
@@ -10,5 +12,6 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    println!("maximous starting with db: {}", cli.db);
+    let _conn = db::open_db(&cli.db).expect("Failed to open database");
+    eprintln!("maximous: database ready at {}", cli.db);
 }
