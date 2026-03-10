@@ -4,6 +4,12 @@ A SQLite brain for multi-agent orchestration with FTS5 search, typed observation
 
 Maximous gives Claude Code agents (sub-agents, team agents, parallel agents) a shared database for coordination, communication, and knowledge sharing via the MCP protocol.
 
+<p align="center">
+  <img src="assets/dashboard-overview.png" alt="Maximous Web Dashboard" width="800">
+  <br>
+  <em>Real-time web dashboard showing agent activity, tasks, and memory</em>
+</p>
+
 ## How It Works
 
 ```
