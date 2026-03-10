@@ -13,19 +13,19 @@ ARCH="$(uname -m)"
 # Normalize architecture
 case "$ARCH" in
   x86_64|amd64) ARCH="x86_64" ;;
-  arm64|aarch64) ARCH="aarch64" ;;
+  arm64|aarch64) ARCH="arm64" ;;
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
 # Normalize OS
 case "$OS" in
-  darwin) OS="apple-darwin" ;;
-  linux)  OS="unknown-linux-gnu" ;;
+  darwin) OS="darwin" ;;
+  linux)  OS="linux" ;;
   *)      echo "Unsupported OS: $OS" >&2; exit 1 ;;
 esac
 
 REPO="laurentlouk/maximous"
-TARGET="${ARCH}-${OS}"
+TARGET="${OS}-${ARCH}"
 
 echo "Installing maximous for ${TARGET}..."
 

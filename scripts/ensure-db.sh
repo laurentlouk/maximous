@@ -19,17 +19,17 @@ ARCH="$(uname -m)"
 
 case "$ARCH" in
   x86_64|amd64) ARCH="x86_64" ;;
-  arm64|aarch64) ARCH="aarch64" ;;
+  arm64|aarch64) ARCH="arm64" ;;
   *) echo "maximous: unsupported architecture $ARCH — install manually with: cargo install --git https://github.com/${REPO}" >&2; exit 0 ;;
 esac
 
 case "$OS" in
-  darwin) OS="apple-darwin" ;;
-  linux)  OS="unknown-linux-gnu" ;;
+  darwin) OS="darwin" ;;
+  linux)  OS="linux" ;;
   *)      echo "maximous: unsupported OS $OS — install manually with: cargo install --git https://github.com/${REPO}" >&2; exit 0 ;;
 esac
 
-TARGET="${ARCH}-${OS}"
+TARGET="${OS}-${ARCH}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/maximous-${TARGET}.tar.gz"
 
 echo "maximous: binary not found, downloading from GitHub Releases..." >&2
