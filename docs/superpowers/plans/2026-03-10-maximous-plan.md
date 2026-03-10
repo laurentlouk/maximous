@@ -2360,3 +2360,379 @@ Expected: Returns JSON with `protocolVersion` and `serverInfo`.
 
 Run: `cargo test`
 Expected: All tests pass. No further commit needed — all code was committed in prior tasks.
+
+---
+
+## Chunk 6: Performance Benchmarks
+
+### Task 15: Efficiency Benchmarks
+
+**Files:**
+- Create: `benches/performance.rs`
+- Modify: `Cargo.toml` (add bench harness config)
+
+- [ ] **Step 1: Add bench dependency to Cargo.toml**
+
+Add to `Cargo.toml`:
+
+```toml
+[[bench]]
+name = "performance"
+harness = false
+
+[dev-dependencies]
+tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+```
+
+- [ ] **Step 2: Write the benchmark suite**
+
+Create `benches/performance.rs`:
+
+```rust
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use rusqlite::Connection;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+// Import from library crate
+use maximous::db;
+use maximous::tools;
+
+fn setup() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    db::init_db(&conn).unwrap();
+    conn
+}
+
+/// Benchmark: memory_set + memory_get round-trip
+/// Target: <1ms average per operation pair
+fn bench_memory_roundtrip(c: &mut Criterion) {
+    let conn = setup();
+
+    c.bench_function("memory_set+get", |b| {
+        let mut i = 0u64;
+        b.iter(|| {
+            let key = format!("key-{}", i);
+            tools::memory::set(
+                &serde_json::json!({"namespace": "bench", "key": key, "value": "{\"data\":true}"}),
+                &conn,
+            );
+            tools::memory::get(
+                &serde_json::json!({"namespace": "bench", "key": key}),
+                &conn,
+            );
+            i += 1;
+        });
+    });
+}
+
+/// Benchmark: memory_set throughput (pure writes)
+/// Target: >10,000 ops/sec
+fn bench_memory_write_throughput(c: &mut Criterion) {
+    let conn = setup();
+
+    c.bench_function("memory_set_throughput", |b| {
+        let mut i = 0u64;
+        b.iter(|| {
+            let key = format!("tp-{}", i);
+            tools::memory::set(
+                &serde_json::json!({"namespace": "throughput", "key": key, "value": "{\"n\":1}"}),
+                &conn,
+            );
+            i += 1;
+        });
+    });
+}
+
+/// Benchmark: message_send + message_read
+/// Target: <1ms average
+fn bench_message_roundtrip(c: &mut Criterion) {
+    let conn = setup();
+
+    c.bench_function("message_send+read", |b| {
+        b.iter(|| {
+            tools::messages::send(
+                &serde_json::json!({"channel": "bench", "sender": "agent", "content": "{\"ping\":true}"}),
+                &conn,
+            );
+            tools::messages::read(
+                &serde_json::json!({"channel": "bench", "limit": 1}),
+                &conn,
+            );
+        });
+    });
+}
+
+/// Benchmark: poll_changes scaling
+/// Insert N changes, then measure poll time
+/// Target: <5ms for poll regardless of table size
+fn bench_poll_changes_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("poll_changes_scaling");
+
+    for size in [100, 1_000, 10_000, 50_000].iter() {
+        let conn = setup();
+
+        // Pre-populate with N changes via memory writes
+        for i in 0..*size {
+            conn.execute(
+                "INSERT INTO changes (table_name, row_id, action, summary, created_at) VALUES ('bench', ?1, 'insert', '{}', 0)",
+                rusqlite::params![format!("row-{}", i)],
+            ).unwrap();
+        }
+
+        // Benchmark polling from near the end (last 100 changes)
+        let since_id = (*size as i64) - 100;
+        group.bench_with_input(
+            BenchmarkId::from_parameter(size),
+            size,
+            |b, _| {
+                b.iter(|| {
+                    tools::changes::poll(
+                        &serde_json::json!({"since_id": since_id, "limit": 100}),
+                        &conn,
+                    );
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+/// Benchmark: task_create + dependency check
+/// Target: <2ms per create with dependency validation
+fn bench_task_with_deps(c: &mut Criterion) {
+    let conn = setup();
+
+    // Create a "done" dependency task
+    let dep = tools::tasks::create(&serde_json::json!({"title": "dep"}), &conn);
+    let dep_id = dep.data.unwrap()["id"].as_str().unwrap().to_string();
+    tools::tasks::update(&serde_json::json!({"id": dep_id, "status": "done"}), &conn);
+
+    c.bench_function("task_create_with_dep_check", |b| {
+        let mut i = 0u64;
+        b.iter(|| {
+            let r = tools::tasks::create(
+                &serde_json::json!({"title": format!("task-{}", i), "dependencies": [dep_id]}),
+                &conn,
+            );
+            let id = r.data.unwrap()["id"].as_str().unwrap().to_string();
+            // Validate dependency check when setting to ready
+            tools::tasks::update(&serde_json::json!({"id": id, "status": "ready"}), &conn);
+            i += 1;
+        });
+    });
+}
+
+/// Benchmark: memory_search over growing dataset
+/// Target: <10ms for LIKE search over 10,000 entries
+fn bench_memory_search_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("memory_search_scaling");
+
+    for size in [100, 1_000, 10_000].iter() {
+        let conn = setup();
+
+        for i in 0..*size {
+            let value = if i % 100 == 0 {
+                format!("{{\"data\":\"needle-{}\"}}", i)
+            } else {
+                format!("{{\"data\":\"haystack-{}\"}}", i)
+            };
+            conn.execute(
+                "INSERT INTO memory (namespace, key, value, created_at, updated_at) VALUES ('search', ?1, ?2, 0, 0)",
+                rusqlite::params![format!("k-{}", i), value],
+            ).unwrap();
+        }
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(size),
+            size,
+            |b, _| {
+                b.iter(|| {
+                    tools::memory::search(
+                        &serde_json::json!({"query": "needle", "namespace": "search"}),
+                        &conn,
+                    );
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_memory_roundtrip,
+    bench_memory_write_throughput,
+    bench_message_roundtrip,
+    bench_poll_changes_scaling,
+    bench_task_with_deps,
+    bench_memory_search_scaling,
+);
+criterion_main!(benches);
+```
+
+- [ ] **Step 3: Run benchmarks**
+
+Run: `cargo bench`
+Expected output includes timing for each benchmark. Verify against targets:
+
+| Benchmark | Target |
+|---|---|
+| `memory_set+get` | <1ms |
+| `memory_set_throughput` | >10,000 ops/sec |
+| `message_send+read` | <1ms |
+| `poll_changes_scaling/50000` | <5ms |
+| `task_create_with_dep_check` | <2ms |
+| `memory_search_scaling/10000` | <10ms |
+
+- [ ] **Step 4: Write concurrent WAL stress test**
+
+Add `tests/concurrent_test.rs`:
+
+```rust
+use rusqlite::Connection;
+use std::sync::{Arc, Barrier};
+use std::thread;
+
+use maximous::db;
+use maximous::tools;
+
+/// Stress test: 4 threads doing concurrent writes via WAL
+/// Verifies no SQLITE_BUSY errors and all writes succeed
+#[test]
+fn test_concurrent_wal_writes() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("concurrent.db");
+    let db_path_str = db_path.to_str().unwrap().to_string();
+
+    // Initialize DB
+    let conn = db::open_db(&db_path_str).unwrap();
+    drop(conn);
+
+    let num_threads = 4;
+    let ops_per_thread = 500;
+    let barrier = Arc::new(Barrier::new(num_threads));
+
+    let handles: Vec<_> = (0..num_threads)
+        .map(|t| {
+            let barrier = Arc::clone(&barrier);
+            let path = db_path_str.clone();
+            thread::spawn(move || {
+                let conn = db::open_db(&path).unwrap();
+                barrier.wait(); // All threads start at the same time
+
+                let mut successes = 0;
+                for i in 0..ops_per_thread {
+                    let result = tools::memory::set(
+                        &serde_json::json!({
+                            "namespace": format!("thread-{}", t),
+                            "key": format!("key-{}", i),
+                            "value": format!("{{\"thread\":{},\"op\":{}}}", t, i)
+                        }),
+                        &conn,
+                    );
+                    if result.ok {
+                        successes += 1;
+                    }
+                }
+                successes
+            })
+        })
+        .collect();
+
+    let total_successes: usize = handles.into_iter().map(|h| h.join().unwrap()).sum();
+    let expected = num_threads * ops_per_thread;
+    assert_eq!(
+        total_successes, expected,
+        "Expected {} successful writes, got {} ({} failed)",
+        expected, total_successes, expected - total_successes
+    );
+
+    // Verify all data is readable
+    let conn = db::open_db(&db_path_str).unwrap();
+    for t in 0..num_threads {
+        let result = tools::memory::get(
+            &serde_json::json!({"namespace": format!("thread-{}", t)}),
+            &conn,
+        );
+        let keys = result.data.unwrap()["keys"].as_array().unwrap().len();
+        assert_eq!(keys, ops_per_thread, "Thread {} should have {} keys", t, ops_per_thread);
+    }
+}
+
+/// Stress test: concurrent reads and writes (mixed workload)
+#[test]
+fn test_concurrent_read_write_mix() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("mixed.db");
+    let db_path_str = db_path.to_str().unwrap().to_string();
+
+    let conn = db::open_db(&db_path_str).unwrap();
+    // Pre-populate some data
+    for i in 0..100 {
+        tools::memory::set(
+            &serde_json::json!({"namespace": "shared", "key": format!("pre-{}", i), "value": "initial"}),
+            &conn,
+        );
+    }
+    drop(conn);
+
+    let barrier = Arc::new(Barrier::new(4));
+
+    // 2 writer threads + 2 reader threads
+    let mut handles = vec![];
+
+    for t in 0..2 {
+        let barrier = Arc::clone(&barrier);
+        let path = db_path_str.clone();
+        handles.push(thread::spawn(move || {
+            let conn = db::open_db(&path).unwrap();
+            barrier.wait();
+            for i in 0..200 {
+                tools::memory::set(
+                    &serde_json::json!({"namespace": "shared", "key": format!("w{}-{}", t, i), "value": "written"}),
+                    &conn,
+                );
+            }
+            true
+        }));
+    }
+
+    for _ in 0..2 {
+        let barrier = Arc::clone(&barrier);
+        let path = db_path_str.clone();
+        handles.push(thread::spawn(move || {
+            let conn = db::open_db(&path).unwrap();
+            barrier.wait();
+            for _ in 0..200 {
+                tools::memory::get(
+                    &serde_json::json!({"namespace": "shared"}),
+                    &conn,
+                );
+                tools::changes::poll(
+                    &serde_json::json!({"since_id": 0, "limit": 10}),
+                    &conn,
+                );
+            }
+            true
+        }));
+    }
+
+    for h in handles {
+        assert!(h.join().unwrap(), "Thread should complete without panic");
+    }
+}
+```
+
+- [ ] **Step 5: Run concurrent tests**
+
+Run: `cargo test --test concurrent_test -- --test-threads=1`
+Expected: Both tests pass with zero failures.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add benches/performance.rs tests/concurrent_test.rs Cargo.toml
+git commit -m "feat: add performance benchmarks and concurrent WAL stress tests"
+```
