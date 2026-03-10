@@ -1,0 +1,11 @@
+{
+  "name": "maximous",
+  "version": "0.1.0",
+  "description": "Lightweight SQLite brain for multi-agent orchestration",
+  "mcp_servers": {
+    "maximous": {
+      "command": "maximous",
+      "args": ["--db", ".maximous/brain.db"]
+    }
+  }
+}
