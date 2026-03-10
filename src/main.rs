@@ -4,6 +4,7 @@ mod tools;
 mod web;
 
 use clap::{Parser, Subcommand};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 #[derive(Parser)]
@@ -27,10 +28,41 @@ enum Commands {
     },
 }
 
+/// Resolve the database path relative to the project root.
+/// If the path is absolute, use as-is.
+/// If relative, find the project root (nearest ancestor with .git/) and resolve from there.
+/// Falls back to cwd if no .git/ is found.
+fn resolve_db_path(db: &str) -> String {
+    let path = Path::new(db);
+    if path.is_absolute() {
+        return db.to_string();
+    }
+
+    let project_root = find_project_root().unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    });
+
+    project_root.join(db).to_string_lossy().to_string()
+}
+
+/// Walk up from cwd to find the nearest directory containing .git/
+fn find_project_root() -> Option<PathBuf> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        if dir.join(".git").exists() {
+            return Some(dir);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
-    let conn = db::open_db(&cli.db).expect("Failed to open database");
-    eprintln!("maximous: database ready at {}", cli.db);
+    let db_path = resolve_db_path(&cli.db);
+    let conn = db::open_db(&db_path).expect("Failed to open database");
+    eprintln!("maximous: database ready at {}", db_path);
 
     let conn = Arc::new(Mutex::new(conn));
 

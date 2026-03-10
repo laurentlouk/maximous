@@ -1,6 +1,6 @@
 {
   "name": "maximous",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "SQLite brain for multi-agent orchestration — FTS5 search, typed observations, progressive disclosure, privacy tags, session tracking, web dashboard, and real-time SSE updates",
   "author": {
     "name": "Laurent",
