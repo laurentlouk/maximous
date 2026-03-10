@@ -28,11 +28,19 @@ Each agent spawns its own MCP server process. All processes share a single SQLit
 
 ### As a Claude Code plugin (recommended)
 
-Install directly from GitHub:
+First, add the marketplace:
 
-```bash
-claude plugin add github:laurentlouk/maximous
 ```
+/plugin marketplace add https://github.com/laurentlouk/claude-plugins
+```
+
+Then install the plugin from the marketplace:
+
+```
+/plugin install maximous
+```
+
+Or browse available plugins interactively with `/plugin` → **Discover** tab.
 
 This installs maximous as a plugin with all skills, hooks, and the MCP server. The binary needs to be available — either build from source or download a release.
 
