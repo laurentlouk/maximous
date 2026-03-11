@@ -443,6 +443,21 @@ td.empty {
     word-break: break-word;
 }
 
+/* Prerequisite warnings */
+.prereq-banner {
+    background: rgba(239, 83, 80, 0.1);
+    border: 1px solid rgba(239, 83, 80, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.prereq-error {
+    color: var(--error);
+    font-size: 0.85rem;
+    padding: 0.25rem 0;
+}
+
 /* Empty state */
 .empty {
     text-align: center;

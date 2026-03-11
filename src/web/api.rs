@@ -385,6 +385,35 @@ pub async fn changes(State(db): State<DbState>, Query(params): Query<ChangesPara
     Json(json!({"changes": changes, "count": changes.len()}))
 }
 
+pub async fn prerequisites() -> Json<Value> {
+    let gh_available = std::process::Command::new("which")
+        .arg("gh")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    let git_available = std::process::Command::new("which")
+        .arg("git")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    let mut errors: Vec<String> = Vec::new();
+    if !gh_available {
+        errors.push("GitHub CLI (gh) not found. Install: https://cli.github.com/".to_string());
+    }
+    if !git_available {
+        errors.push("git not found".to_string());
+    }
+
+    Json(json!({
+        "gh": gh_available,
+        "git": git_available,
+        "errors": errors,
+        "all_ok": errors.is_empty()
+    }))
+}
+
 /// SSE endpoint that streams changes in real-time
 pub async fn events_sse(
     State(db): State<DbState>,

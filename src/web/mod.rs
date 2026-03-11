@@ -32,6 +32,7 @@ pub fn create_router(db: DbState) -> Router {
         .route("/api/memory", get(api::memory))
         .route("/api/sessions", get(api::sessions))
         .route("/api/changes", get(api::changes))
+        .route("/api/prerequisites", get(api::prerequisites))
         .route("/api/events", get(api::events_sse))
         .layer(cors)
         .with_state(db)

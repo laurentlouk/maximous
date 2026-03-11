@@ -75,8 +75,21 @@ function setContent(el, sanitizedMarkup) {
 
 // Page loaders
 async function loadOverview() {
-    const data = await fetchJSON('/api/overview');
+    var results = await Promise.all([
+        fetchJSON('/api/overview'),
+        fetchJSON('/api/prerequisites'),
+    ]);
+    const data = results[0];
+    var prereqs = results[1];
     const el = document.getElementById('page-overview');
+    var banner = '';
+    if (!prereqs.all_ok) {
+        banner = '<div class="prereq-banner">' +
+            (prereqs.errors || []).map(function(e) {
+                return '<div class="prereq-error">' + escapeHtml(e) + '</div>';
+            }).join('') +
+        '</div>';
+    }
     const taskCards = Object.entries(data.tasks_by_status || {})
         .map(function(entry) {
             return '<div class="card"><h3>' + escapeHtml(entry[0]) + '</h3><div class="value">' + entry[1] + '</div></div>';
@@ -84,6 +97,7 @@ async function loadOverview() {
         .join('');
     setContent(el,
         '<h2>Overview</h2>' +
+        banner +
         '<div class="cards">' +
             '<div class="card"><h3>Agents</h3><div class="value">' + (data.agents || 0) + '</div></div>' +
             '<div class="card"><h3>Teams</h3><div class="value">' + (data.teams || 0) + '</div></div>' +
