@@ -22,7 +22,9 @@ const loaders = {
     overview: loadOverview,
     agents: loadAgents,
     tasks: loadTasks,
-    messages: loadMessages,
+    teams: loadTeams,
+    tickets: loadTickets,
+    launches: loadLaunches,
     memory: loadMemory,
     sessions: loadSessions,
     activity: loadActivity,
@@ -84,8 +86,10 @@ async function loadOverview() {
         '<h2>Overview</h2>' +
         '<div class="cards">' +
             '<div class="card"><h3>Agents</h3><div class="value">' + (data.agents || 0) + '</div></div>' +
+            '<div class="card"><h3>Teams</h3><div class="value">' + (data.teams || 0) + '</div></div>' +
+            '<div class="card"><h3>Tickets</h3><div class="value">' + (data.tickets || 0) + '</div></div>' +
+            '<div class="card"><h3>Active Launches</h3><div class="value">' + (data.active_launches || 0) + '</div></div>' +
             '<div class="card"><h3>Memory Entries</h3><div class="value">' + (data.memory_entries || 0) + '</div></div>' +
-            '<div class="card"><h3>Unacked Messages</h3><div class="value">' + (data.unacked_messages || 0) + '</div></div>' +
             '<div class="card"><h3>Active Sessions</h3><div class="value">' + (data.active_sessions || 0) + '</div></div>' +
             taskCards +
         '</div>' +
@@ -138,45 +142,130 @@ async function loadTasks() {
         '</div>');
 }
 
-async function loadMessages() {
-    var data = await fetchJSON('/api/messages?limit=50');
-    var el = document.getElementById('page-messages');
-    var channelTabs = (data.channels || []).map(function(c) {
-        return '<button class="channel-tab" data-channel="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>';
+async function loadTeams() {
+    var el = document.getElementById('page-teams');
+    var results = await Promise.all([
+        fetchJSON('/api/agent-definitions'),
+        fetchJSON('/api/teams'),
+    ]);
+    var defs = results[0];
+    var teamsData = results[1];
+
+    var defRows = (defs.agent_definitions || []).map(function(d) {
+        var caps = '';
+        try { caps = JSON.parse(d.capabilities || '[]').join(', '); } catch(e) { caps = escapeHtml(d.capabilities || '-'); }
+        var prompt = d.prompt_hint || '';
+        var promptTrunc = prompt.substring(0, 60) + (prompt.length > 60 ? '...' : '');
+        var modelKey = (d.model || '').toLowerCase().replace(/[^a-z]/g, '');
+        var modelBadge = d.model ? badge(escapeHtml(d.model), modelKey) : '-';
+        return '<tr>' +
+            '<td title="' + escapeHtml(d.id) + '">' + escapeHtml(d.id).substring(0, 8) + '...</td>' +
+            '<td>' + escapeHtml(d.name || '-') + '</td>' +
+            '<td>' + escapeHtml(caps) + '</td>' +
+            '<td>' + modelBadge + '</td>' +
+            '<td title="' + escapeHtml(prompt) + '">' + escapeHtml(promptTrunc) + '</td>' +
+        '</tr>';
     }).join('');
-    var msgs = (data.messages || []).map(function(m) {
-        return '<div class="message-item ' + (m.acknowledged ? '' : 'unacked') + '">' +
-            '<div class="message-header">' +
-                '<span class="sender">' + escapeHtml(m.sender) + '</span>' +
-                '<span class="channel-label">#' + escapeHtml(m.channel) + '</span>' +
-                priorityBadge(m.priority) +
-                '<span class="time">' + timeAgo(m.created_at) + '</span>' +
-            '</div>' +
-            '<div class="message-content">' + escapeHtml(m.content) + '</div>' +
+
+    var teamCards = (teamsData.teams || []).map(function(t) {
+        var members = (t.members || []).map(function(m) {
+            var roleKey = (m.role || '').toLowerCase();
+            return '<div class="team-member">' +
+                '<span class="member-name">' + escapeHtml(m.name || m.agent_id || '-') + '</span>' +
+                badge(escapeHtml(m.role || 'member'), roleKey) +
+                (m.model ? ' <span class="text-muted">' + escapeHtml(m.model) + '</span>' : '') +
+            '</div>';
+        }).join('');
+        return '<div class="card team-card">' +
+            '<h3>' + escapeHtml(t.name || t.id) + '</h3>' +
+            '<div class="team-members">' + (members || '<span class="text-muted">No members</span>') + '</div>' +
         '</div>';
     }).join('');
+
     setContent(el,
-        '<h2>Messages</h2>' +
-        '<div class="channel-tabs">' + (channelTabs || '<span class="text-muted">No channels</span>') + '</div>' +
-        '<div class="messages-list">' + (msgs || '<div class="empty">No messages</div>') + '</div>');
-    // Channel tab click handlers
+        '<h2>Teams</h2>' +
+        '<h3 style="margin-bottom:1rem">Agent Definitions</h3>' +
+        '<div class="table-container" style="margin-bottom:2rem">' +
+            '<table><thead><tr><th>ID</th><th>Name</th><th>Capabilities</th><th>Model</th><th>Prompt Hint</th></tr></thead>' +
+            '<tbody>' + (defRows || '<tr><td colspan="5" class="empty">No agent definitions</td></tr>') + '</tbody></table>' +
+        '</div>' +
+        '<h3 style="margin-bottom:1rem">Teams</h3>' +
+        '<div class="cards">' + (teamCards || '<div class="empty">No teams</div>') + '</div>');
+}
+
+async function loadTickets() {
+    var el = document.getElementById('page-tickets');
+
+    async function renderTickets(url) {
+        var data = await fetchJSON(url);
+        var rows = (data.tickets || []).map(function(t) {
+            var titleCell = t.url
+                ? '<a href="' + escapeHtml(t.url) + '" target="_blank" rel="noopener">' + escapeHtml(t.title || '-') + '</a>'
+                : escapeHtml(t.title || '-');
+            var labels = (t.labels || []).map(function(l) { return badge(escapeHtml(l)); }).join(' ');
+            return '<tr>' +
+                '<td>' + badge(escapeHtml(t.source || '-'), (t.source || '').toLowerCase()) + '</td>' +
+                '<td>' + escapeHtml(t.external_id || '-') + '</td>' +
+                '<td>' + titleCell + '</td>' +
+                '<td>' + badge(escapeHtml(t.status || '-'), (t.status || '').toLowerCase()) + '</td>' +
+                '<td>' + (t.priority != null ? priorityBadge(t.priority) : '-') + '</td>' +
+                '<td>' + (labels || '-') + '</td>' +
+                '<td>' + timeAgo(t.fetched_at) + '</td>' +
+            '</tr>';
+        }).join('');
+        setContent(el.querySelector('.tickets-table-container'),
+            '<div class="table-container">' +
+                '<table><thead><tr><th>Source</th><th>ID</th><th>Title</th><th>Status</th><th>Priority</th><th>Labels</th><th>Fetched</th></tr></thead>' +
+                '<tbody>' + (rows || '<tr><td colspan="7" class="empty">No tickets</td></tr>') + '</tbody></table>' +
+            '</div>');
+    }
+
+    setContent(el,
+        '<h2>Tickets</h2>' +
+        '<div class="channel-tabs" style="margin-bottom:1.25rem">' +
+            '<button class="channel-tab active" data-source="">All</button>' +
+            '<button class="channel-tab" data-source="linear">Linear</button>' +
+            '<button class="channel-tab" data-source="jira">Jira</button>' +
+        '</div>' +
+        '<div class="tickets-table-container"></div>');
+
+    await renderTickets('/api/tickets');
+
     el.querySelectorAll('.channel-tab').forEach(function(btn) {
         btn.addEventListener('click', async function() {
-            var ch = btn.dataset.channel;
-            var filtered = await fetchJSON('/api/messages?channel=' + encodeURIComponent(ch));
-            var fMsgs = (filtered.messages || []).map(function(m) {
-                return '<div class="message-item ' + (m.acknowledged ? '' : 'unacked') + '">' +
-                    '<div class="message-header">' +
-                        '<span class="sender">' + escapeHtml(m.sender) + '</span>' +
-                        priorityBadge(m.priority) +
-                        '<span class="time">' + timeAgo(m.created_at) + '</span>' +
-                    '</div>' +
-                    '<div class="message-content">' + escapeHtml(m.content) + '</div>' +
-                '</div>';
-            }).join('');
-            setContent(el.querySelector('.messages-list'), fMsgs || '<div class="empty">No messages</div>');
+            el.querySelectorAll('.channel-tab').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var src = btn.dataset.source;
+            var url = src ? '/api/tickets?source=' + encodeURIComponent(src) : '/api/tickets';
+            await renderTickets(url);
         });
     });
+}
+
+async function loadLaunches() {
+    var data = await fetchJSON('/api/launches');
+    var el = document.getElementById('page-launches');
+    var rows = (data.launches || []).map(function(l) {
+        var prCell = l.pr_url
+            ? '<a href="' + escapeHtml(l.pr_url) + '" target="_blank" rel="noopener">PR</a>'
+            : '-';
+        var errTrunc = l.error ? l.error.substring(0, 60) + (l.error.length > 60 ? '...' : '') : '';
+        return '<tr>' +
+            '<td>' + escapeHtml(l.ticket_title || '-') + '</td>' +
+            '<td>' + escapeHtml(l.team_name || '-') + '</td>' +
+            '<td>' + escapeHtml(l.branch || '-') + '</td>' +
+            '<td>' + badge(escapeHtml(l.status || '-'), (l.status || '').toLowerCase()) + '</td>' +
+            '<td>' + prCell + '</td>' +
+            '<td title="' + escapeHtml(l.error || '') + '">' + escapeHtml(errTrunc) + '</td>' +
+            '<td>' + timeAgo(l.created_at) + '</td>' +
+        '</tr>';
+    }).join('');
+    setContent(el,
+        '<h2>Launches</h2>' +
+        '<div class="table-container">' +
+            '<table><thead><tr><th>Ticket</th><th>Team</th><th>Branch</th><th>Status</th><th>PR</th><th>Error</th><th>Created</th></tr></thead>' +
+            '<tbody>' + (rows || '<tr><td colspan="7" class="empty">No launches</td></tr>') + '</tbody></table>' +
+        '</div>');
 }
 
 async function loadMemory() {
