@@ -1,6 +1,6 @@
 {
   "name": "maximous",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "SQLite brain for Claude Code — agent registry, teams, ticket integration (Linear/Jira), parallel launch tracking, session continuity, FTS5 search, typed observations, web dashboard with real-time SSE",
   "author": {
     "name": "Laurent",

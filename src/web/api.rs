@@ -723,22 +723,22 @@ pub async fn execute_launch(
         prompt_file = prompt_file,
     );
 
-    // Use osascript on macOS to open a new Terminal tab
-    let apple_script = format!(
-        "tell application \"Terminal\"\n\
-           activate\n\
-           do script \"{}\"\n\
-         end tell",
-        shell_cmd.replace('\\', "\\\\").replace('"', "\\\"")
-    );
-
-    let result = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(&apple_script)
+    // Run in background directly (no new terminal needed)
+    let log_file = format!("/tmp/maximous-launch-{}.log", id);
+    let result = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
+        .stdout(std::fs::File::create(&log_file).unwrap_or_else(|_| {
+            std::fs::File::create("/dev/null").unwrap()
+        }))
+        .stderr(std::fs::File::create(format!("{}.err", &log_file)).unwrap_or_else(|_| {
+            std::fs::File::create("/dev/null").unwrap()
+        }))
+        .stdin(std::process::Stdio::null())
         .spawn();
 
     match result {
-        Ok(_) => Json(json!({"ok": true, "message": "Claude Code launched in new terminal"})),
-        Err(e) => Json(json!({"ok": false, "error": format!("failed to open terminal: {}", e)})),
+        Ok(child) => Json(json!({"ok": true, "message": "Claude Code launched in background", "pid": child.id()})),
+        Err(e) => Json(json!({"ok": false, "error": format!("failed to spawn process: {}", e)})),
     }
 }

@@ -448,7 +448,7 @@ async function loadTickets() {
                     this.textContent = 'Launch';
                     return;
                 }
-                // Step 2: Execute — opens Claude Code in a new terminal
+                // Step 2: Execute — launches Claude Code in background
                 var launchId = result.data && result.data.launch && result.data.launch.id;
                 if (launchId) {
                     var execResp = await fetch(API + '/api/launches/' + encodeURIComponent(launchId) + '/execute', {
@@ -489,15 +489,12 @@ async function loadLaunches() {
             ? '<a href="' + escapeHtml(l.pr_url) + '" target="_blank" rel="noopener">PR</a>'
             : '-';
         var errTrunc = l.error ? l.error.substring(0, 60) + (l.error.length > 60 ? '...' : '') : '';
-        var statusSelect = '<select class="launch-status-select" data-id="' + escapeHtml(l.id) + '">' +
-            ['pending', 'running', 'done', 'failed'].map(function(s) {
-                return '<option value="' + s + '"' + (l.status === s ? ' selected' : '') + '>' + s + '</option>';
-            }).join('') + '</select>';
+        var statusBadge = badge(escapeHtml(l.status || 'pending'));
         return '<tr>' +
             '<td>' + escapeHtml(l.ticket_title || l.ticket_id || '-') + '</td>' +
             '<td>' + escapeHtml(l.team_name || '-') + '</td>' +
             '<td><code style="font-size:0.75rem">' + escapeHtml(l.branch || '-') + '</code></td>' +
-            '<td>' + statusSelect + '</td>' +
+            '<td>' + statusBadge + '</td>' +
             '<td>' + prCell + '</td>' +
             '<td title="' + escapeHtml(l.error || '') + '">' + escapeHtml(errTrunc) + '</td>' +
             '<td>' + timeAgo(l.created_at) + '</td>' +
@@ -510,20 +507,6 @@ async function loadLaunches() {
             '<table><thead><tr><th>Ticket</th><th>Team</th><th>Branch</th><th>Status</th><th>PR</th><th>Error</th><th>Created</th><th></th></tr></thead>' +
             '<tbody>' + (rows || '<tr><td colspan="8" class="empty">No launches</td></tr>') + '</tbody></table>' +
         '</div>');
-
-    // Status update handlers
-    el.querySelectorAll('.launch-status-select').forEach(function(select) {
-        select.addEventListener('change', async function() {
-            var id = this.dataset.id;
-            var resp = await fetch(API + '/api/launches/' + encodeURIComponent(id), {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: this.value }),
-            });
-            var result = await resp.json();
-            if (!result.ok) alert('Error: ' + (result.error || 'Unknown error'));
-        });
-    });
 
     // Delete launch handlers
     el.querySelectorAll('.btn-delete-launch').forEach(function(btn) {
