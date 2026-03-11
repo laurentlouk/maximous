@@ -95,6 +95,13 @@ fn migrate(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    let has_assignee: bool = conn
+        .prepare("SELECT assignee FROM tickets LIMIT 0")
+        .is_ok();
+    if !has_assignee {
+        conn.execute_batch("ALTER TABLE tickets ADD COLUMN assignee TEXT NOT NULL DEFAULT '';")?;
+    }
+
     Ok(())
 }
 

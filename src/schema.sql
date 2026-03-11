@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL,
+    assignee TEXT NOT NULL DEFAULT '',
     priority INTEGER NOT NULL DEFAULT 2,
     url TEXT NOT NULL DEFAULT '',
     labels TEXT NOT NULL DEFAULT '[]',

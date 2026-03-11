@@ -304,6 +304,30 @@ fn test_ticket_get_not_found() {
 }
 
 #[test]
+fn test_ticket_cache_with_assignee() {
+    let conn = setup();
+    let result = tools::tickets::cache(
+        &serde_json::json!({
+            "id": "t-assignee-1",
+            "source": "linear",
+            "external_id": "ENG-700",
+            "title": "Assigned ticket",
+            "status": "in_progress",
+            "assignee": "alice@example.com",
+        }),
+        &conn,
+    );
+    assert!(result.ok, "cache_ticket failed: {:?}", result.error);
+
+    let list_result = tools::tickets::list(&serde_json::json!({}), &conn);
+    assert!(list_result.ok);
+    let data = list_result.data.unwrap();
+    let tickets = data["tickets"].as_array().unwrap();
+    assert_eq!(tickets.len(), 1);
+    assert_eq!(tickets[0]["assignee"], "alice@example.com");
+}
+
+#[test]
 fn test_ticket_list_priority_ordering() {
     let conn = setup();
     // Insert with different priorities

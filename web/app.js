@@ -222,6 +222,7 @@ async function loadTickets() {
                 '<td>' + escapeHtml(t.external_id || '-') + '</td>' +
                 '<td>' + titleCell + '</td>' +
                 '<td>' + badge(escapeHtml(t.status || '-'), (t.status || '').toLowerCase()) + '</td>' +
+                '<td>' + escapeHtml(t.assignee || '-') + '</td>' +
                 '<td>' + (t.priority != null ? priorityBadge(t.priority) : '-') + '</td>' +
                 '<td>' + (labels || '-') + '</td>' +
                 '<td>' + timeAgo(t.fetched_at) + '</td>' +
@@ -229,8 +230,8 @@ async function loadTickets() {
         }).join('');
         setContent(el.querySelector('.tickets-table-container'),
             '<div class="table-container">' +
-                '<table><thead><tr><th>Source</th><th>ID</th><th>Title</th><th>Status</th><th>Priority</th><th>Labels</th><th>Fetched</th></tr></thead>' +
-                '<tbody>' + (rows || '<tr><td colspan="7" class="empty">No tickets</td></tr>') + '</tbody></table>' +
+                '<table><thead><tr><th>Source</th><th>ID</th><th>Title</th><th>Status</th><th>Assignee</th><th>Priority</th><th>Labels</th><th>Fetched</th></tr></thead>' +
+                '<tbody>' + (rows || '<tr><td colspan="8" class="empty">No tickets</td></tr>') + '</tbody></table>' +
             '</div>');
     }
 

@@ -220,7 +220,7 @@ pub async fn tickets(State(db): State<DbState>, Query(params): Query<TicketsPara
     };
 
     let sql = format!(
-        "SELECT id, source, external_id, title, status, priority, url, labels, fetched_at
+        "SELECT id, source, external_id, title, status, assignee, priority, url, labels, fetched_at
          FROM tickets {} ORDER BY fetched_at DESC LIMIT ?{} OFFSET ?{}",
         where_clause, idx, idx + 1
     );
@@ -236,10 +236,11 @@ pub async fn tickets(State(db): State<DbState>, Query(params): Query<TicketsPara
             "external_id": row.get::<_, Option<String>>(2)?,
             "title": row.get::<_, String>(3)?,
             "status": row.get::<_, Option<String>>(4)?,
-            "priority": row.get::<_, Option<String>>(5)?,
-            "url": row.get::<_, Option<String>>(6)?,
-            "labels": row.get::<_, Option<String>>(7)?,
-            "fetched_at": row.get::<_, i64>(8)?,
+            "assignee": row.get::<_, Option<String>>(5)?,
+            "priority": row.get::<_, Option<String>>(6)?,
+            "url": row.get::<_, Option<String>>(7)?,
+            "labels": row.get::<_, Option<String>>(8)?,
+            "fetched_at": row.get::<_, i64>(9)?,
         }))
     }).unwrap().filter_map(|r| r.ok()).collect();
 
