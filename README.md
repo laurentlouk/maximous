@@ -5,9 +5,9 @@ A SQLite brain for Claude Code — session continuity, subagent knowledge persis
 Maximous enhances Claude Code with persistent context that survives across sessions, preserves subagent findings before they're compressed, and coordinates parallel agents through a shared SQLite database via MCP.
 
 <p align="center">
-  <img src="assets/dashboard-overview.png" alt="Maximous Web Dashboard" width="800">
+  <img src="assets/dashboard-overview.png" alt="Maximous Web Dashboard — Overview" width="800">
   <br>
-  <em>Real-time web dashboard showing agent activity, tasks, and memory</em>
+  <em>Real-time web dashboard with agent registry, team management, ticket tracking, and launch orchestration</em>
 </p>
 
 ## How It Works
@@ -28,13 +28,15 @@ Each agent spawns its own MCP server process. All processes share a single SQLit
 | Domain | Tools | Purpose |
 |---|---|---|
 | **Memory** | `memory_set`, `memory_get`, `memory_search`, `memory_search_index`, `memory_delete` | FTS5-powered shared knowledge store with typed observations, privacy tags, and progressive disclosure |
-| **Messages** | `message_send`, `message_read`, `message_ack` | Priority message queue with channels |
 | **Tasks** | `task_create`, `task_update`, `task_list` | Task board with dependencies and pagination |
-| **Agents** | `agent_register`, `agent_heartbeat`, `agent_list` | Agent registry with heartbeat |
+| **Agents** | `agent_register`, `agent_heartbeat`, `agent_list`, `agent_define`, `agent_remove`, `agent_catalog` | Agent registry with heartbeat and reusable definitions |
+| **Teams** | `team_create`, `team_list`, `team_delete`, `team_add_member`, `team_remove_member` | Compose agents into named teams for coordinated work |
+| **Tickets** | `ticket_cache`, `ticket_list`, `ticket_get`, `ticket_clear` | Cache and track external tickets (Linear, Jira) |
+| **Launches** | `launch_create`, `launch_update`, `launch_list`, `launch_delete` | Assign tickets to teams, track execution status and PRs |
 | **Sessions** | `session_start`, `session_end`, `session_list` | Track agent work sessions with summaries |
 | **Observe** | `poll_changes` | Watch for state changes across all tables |
 
-**18 tools** across 6 domains.
+**30 tools** across 8 domains.
 
 ## Key Features
 
@@ -61,14 +63,34 @@ Automatic hooks preserve context across Claude Code sessions:
 Reserved namespaces: `sessions`, `agent-findings`, `context-preservation`.
 
 ### Web Dashboard
-Built-in web dashboard at `http://127.0.0.1:8375` with 7 views:
+Built-in web dashboard at `http://127.0.0.1:8375` with 9 views:
 - **Overview** — stat cards + activity feed
 - **Agents** — registry with heartbeat status
 - **Tasks** — table with status/priority badges and dependencies
-- **Messages** — channel-based message browser
+- **Teams** — agent definitions, team composition with add/remove members
+- **Tickets** — cached Linear/Jira tickets with status, priority, labels, and launch buttons
+- **Launches** — ticket-to-team assignments with status tracking, branch names, and PR links
 - **Memory** — 3-pane namespace/key/value explorer
 - **Sessions** — session history with summaries
 - **Activity** — real-time change feed via SSE
+
+<p align="center">
+  <img src="assets/dashboard-teams.png" alt="Teams — agent definitions and team composition" width="800">
+  <br>
+  <em>Teams view: define agents, compose teams, add/remove members</em>
+</p>
+
+<p align="center">
+  <img src="assets/dashboard-tickets.png" alt="Tickets — Linear integration with launch controls" width="800">
+  <br>
+  <em>Tickets view: cached Linear tickets with priority badges, status, and one-click launch</em>
+</p>
+
+<p align="center">
+  <img src="assets/dashboard-launches.png" alt="Launches — ticket execution tracking" width="800">
+  <br>
+  <em>Launches view: track ticket execution across teams with status, branches, and PR links</em>
+</p>
 
 Start the dashboard:
 ```bash
@@ -150,22 +172,23 @@ If you just want the MCP server without the full plugin, add to your project's `
 
 ## Usage
 
-Claude Code auto-spawns the MCP server and makes all 18 tools available to agents. The SessionStart hook runs automatically every session to ensure the binary and `.maximous/` directory exist.
+Claude Code auto-spawns the MCP server and makes all 30 tools available to agents. The SessionStart hook runs automatically every session to ensure the binary and `.maximous/` directory exist.
 
 ### Skills
 
-The plugin includes 8 skills that teach agents how to use maximous. Skills trigger automatically based on what you say:
+The plugin includes skills that teach agents how to use maximous. Skills trigger automatically based on what you say:
 
 | Skill | Trigger examples | Purpose |
 |---|---|---|
 | **session-continuity** | "resume previous work", "pick up where I left off" | Cross-session context persistence |
 | **orchestrate** | "orchestrate agents", "set up multi-agent workflow" | Set up full multi-agent workflows |
 | **coordinate** | "manage tasks", "create task graph" | Task lifecycle and dependency management |
-| **communicate** | "send a message to agents", "use message channels" | Message channels and priority queues |
+| **teams** | "define agents", "create teams", "manage team members" | Agent definitions and team composition |
 | **memory** | "store this in memory", "share data between agents" | Shared key-value storage with TTL |
 | **observe** | "watch for changes", "poll for updates" | Watch for state changes via polling |
 | **status** | "maximous status", "show agent status" | Quick overview of current state |
 | **cleanup** | "clean up maximous", "expire old data" | Expire stale data and maintain the database |
+| **dashboard** | "open dashboard", "show dashboard" | Open the web dashboard in your browser |
 
 ### When Does Maximous Activate?
 
@@ -203,7 +226,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 Should return:
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"maximous","version":"0.5.0"}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"maximous","version":"0.7.0"}}}
 ```
 
 ## Multi-Agent Example
@@ -255,33 +278,40 @@ maximous/
 │   ├── main.rs          # CLI entry: subcommands (default=MCP, dashboard=web)
 │   ├── lib.rs           # Library root
 │   ├── db.rs            # SQLite init, WAL mode, migrations
-│   ├── schema.sql       # 7 tables, 9 indexes, 19 triggers, FTS5
-│   ├── mcp.rs           # JSON-RPC types, stdio loop, 18 tool defs
+│   ├── schema.sql       # 11 tables, indexes, triggers, FTS5
+│   ├── mcp.rs           # JSON-RPC types, stdio loop, 30 tool defs
 │   ├── tools/
 │   │   ├── mod.rs       # ToolResult type, dispatch router
 │   │   ├── memory.rs    # FTS5 search, observations, privacy, progressive disclosure
-│   │   ├── messages.rs  # Priority queue with channels
 │   │   ├── tasks.rs     # Dependency graph, status lifecycle
 │   │   ├── agents.rs    # Registry with heartbeat
+│   │   ├── definitions.rs # Reusable agent definitions (define, catalog, remove)
+│   │   ├── teams.rs     # Team composition and member management
+│   │   ├── tickets.rs   # External ticket caching (Linear, Jira)
+│   │   ├── launches.rs  # Ticket-to-team launch tracking
 │   │   ├── sessions.rs  # Session tracking
 │   │   └── changes.rs   # Observation/change log polling
 │   └── web/
 │       ├── mod.rs       # Axum router, static assets via rust-embed
 │       └── api.rs       # REST endpoints + SSE stream
-├── tests/               # 61 tests
+├── tests/               # 155 tests
 ├── benches/             # Criterion benchmarks
 └── .github/workflows/   # CI + release builds
 ```
 
 ### Database Schema
 
-7 tables + FTS5 + change log, connected by SQLite triggers:
+11 tables + FTS5 + change log, connected by SQLite triggers:
 
 - **memory** — `(namespace, key)` primary key, JSON values, optional TTL, observation_type, category
 - **memory_fts** — FTS5 virtual table for ranked full-text search
-- **messages** — auto-increment ID, channels, priority (0-3), acknowledgment
 - **tasks** — UUID ID, status lifecycle (pending/ready/running/done/failed), JSON dependencies
 - **agents** — heartbeat-based liveness, JSON capabilities
+- **agent_definitions** — reusable agent templates with capabilities, model, and prompt hints
+- **teams** — named groups with description
+- **team_members** — agent-to-team assignments with roles
+- **tickets** — cached external tickets (Linear, Jira) with status, priority, labels, assignee
+- **launches** — ticket-to-team execution records with branch, status, PR URL, error tracking
 - **sessions** — agent work sessions with start/end times and summaries
 - **changes** — auto-populated by triggers on INSERT/UPDATE/DELETE across all tables
 - **config** — simple key-value settings
@@ -312,14 +342,17 @@ cargo build
 ### Running tests
 
 ```bash
-# All tests (61 total)
+# All tests (155 total)
 cargo test
 
 # Specific test suite
 cargo test --test memory_test
-cargo test --test messages_test
 cargo test --test tasks_test
 cargo test --test agents_test
+cargo test --test definitions_test
+cargo test --test team_tools_test
+cargo test --test tickets_test
+cargo test --test launches_test
 cargo test --test changes_test
 cargo test --test sessions_test
 cargo test --test pagination_test
@@ -327,6 +360,7 @@ cargo test --test observation_test
 cargo test --test progressive_test
 cargo test --test privacy_test
 cargo test --test integration_test
+cargo test --test teams_integration_test
 cargo test --test concurrent_test
 cargo test --test mcp_test
 cargo test --test db_test
@@ -380,8 +414,8 @@ Benchmarks cover:
 Tag a version to trigger cross-platform builds and a GitHub Release:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 GitHub Actions builds binaries for macOS (arm64, x86_64) and Linux (arm64, x86_64), then creates a release with the tarballs attached.
