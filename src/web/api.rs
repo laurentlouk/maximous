@@ -1,5 +1,5 @@
 use axum::{
-    extract::{State, Query},
+    extract::{State, Query, Path},
     response::sse::{Event, Sse},
     Json,
 };
@@ -455,4 +455,38 @@ pub async fn events_sse(
     };
 
     Sse::new(stream)
+}
+
+#[derive(Deserialize)]
+pub struct AddMemberBody {
+    pub agent_id: String,
+    pub role: Option<String>,
+}
+
+pub async fn add_team_member(
+    State(db): State<DbState>,
+    Path(name): Path<String>,
+    Json(body): Json<AddMemberBody>,
+) -> Json<Value> {
+    let args = json!({
+        "team_name": name,
+        "agent_id": body.agent_id,
+        "role": body.role.unwrap_or_default(),
+    });
+    let conn = db.lock().unwrap();
+    let result = crate::tools::teams::add_member(&args, &conn);
+    Json(json!({"ok": result.ok, "data": result.data, "error": result.error}))
+}
+
+pub async fn remove_team_member(
+    State(db): State<DbState>,
+    Path((name, agent_id)): Path<(String, String)>,
+) -> Json<Value> {
+    let args = json!({
+        "team_name": name,
+        "agent_id": agent_id,
+    });
+    let conn = db.lock().unwrap();
+    let result = crate::tools::teams::remove_member(&args, &conn);
+    Json(json!({"ok": result.ok, "data": result.data, "error": result.error}))
 }

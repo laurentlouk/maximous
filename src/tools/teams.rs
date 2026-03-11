@@ -149,3 +149,84 @@ pub fn delete(args: &Value, conn: &Connection) -> ToolResult {
         Err(e) => ToolResult::fail(&format!("db error: {}", e)),
     }
 }
+
+pub fn add_member(args: &Value, conn: &Connection) -> ToolResult {
+    let team_name = match args["team_name"].as_str() {
+        Some(s) => s,
+        None => return ToolResult::fail("missing required field: team_name"),
+    };
+    let agent_id = match args["agent_id"].as_str() {
+        Some(s) => s,
+        None => return ToolResult::fail("missing required field: agent_id"),
+    };
+    let role = args["role"].as_str().unwrap_or("");
+
+    // Look up team by name
+    let team_id: String = match conn.query_row(
+        "SELECT id FROM teams WHERE name = ?1",
+        rusqlite::params![team_name],
+        |row| row.get(0),
+    ) {
+        Ok(id) => id,
+        Err(_) => return ToolResult::fail(&format!("team not found: {}", team_name)),
+    };
+
+    // Verify agent exists
+    let agent_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM agent_definitions WHERE id = ?1",
+        rusqlite::params![agent_id],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0) > 0;
+
+    if !agent_exists {
+        return ToolResult::fail(&format!("agent not found: {}", agent_id));
+    }
+
+    match conn.execute(
+        "INSERT INTO team_members (team_id, agent_id, role) VALUES (?1, ?2, ?3)",
+        rusqlite::params![team_id, agent_id, role],
+    ) {
+        Ok(_) => ToolResult::success(serde_json::json!({
+            "added": true,
+            "team_name": team_name,
+            "agent_id": agent_id,
+            "role": role,
+        })),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("UNIQUE") {
+                return ToolResult::fail(&format!("agent {} is already a member of team {}", agent_id, team_name));
+            }
+            ToolResult::fail(&format!("db error: {}", e))
+        }
+    }
+}
+
+pub fn remove_member(args: &Value, conn: &Connection) -> ToolResult {
+    let team_name = match args["team_name"].as_str() {
+        Some(s) => s,
+        None => return ToolResult::fail("missing required field: team_name"),
+    };
+    let agent_id = match args["agent_id"].as_str() {
+        Some(s) => s,
+        None => return ToolResult::fail("missing required field: agent_id"),
+    };
+
+    // Look up team by name
+    let team_id: String = match conn.query_row(
+        "SELECT id FROM teams WHERE name = ?1",
+        rusqlite::params![team_name],
+        |row| row.get(0),
+    ) {
+        Ok(id) => id,
+        Err(_) => return ToolResult::fail(&format!("team not found: {}", team_name)),
+    };
+
+    match conn.execute(
+        "DELETE FROM team_members WHERE team_id = ?1 AND agent_id = ?2",
+        rusqlite::params![team_id, agent_id],
+    ) {
+        Ok(deleted) => ToolResult::success(serde_json::json!({"removed": deleted > 0})),
+        Err(e) => ToolResult::fail(&format!("db error: {}", e)),
+    }
+}

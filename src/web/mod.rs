@@ -1,6 +1,6 @@
 pub mod api;
 
-use axum::{Router, routing::get, response::Html};
+use axum::{Router, routing::{get, post, delete}, response::Html};
 use rust_embed::Embed;
 use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
@@ -27,6 +27,8 @@ pub fn create_router(db: DbState) -> Router {
         .route("/api/tasks", get(api::tasks))
         .route("/api/agent-definitions", get(api::agent_definitions))
         .route("/api/teams", get(api::teams))
+        .route("/api/teams/:name/members", post(api::add_team_member))
+        .route("/api/teams/:name/members/:agent_id", delete(api::remove_team_member))
         .route("/api/tickets", get(api::tickets))
         .route("/api/launches", get(api::launches))
         .route("/api/memory", get(api::memory))

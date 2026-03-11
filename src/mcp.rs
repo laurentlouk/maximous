@@ -413,6 +413,7 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                         "items": {"type": "string"},
                         "description": "Ticket labels"
                     },
+                    "assignee": {"type": "string", "description": "Assignee name or identifier"},
                     "metadata": {"type": "object", "description": "Additional metadata"}
                 },
                 "required": ["id", "source", "external_id", "title", "status"]

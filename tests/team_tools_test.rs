@@ -249,3 +249,103 @@ fn test_dispatch_team_delete() {
     assert!(result.ok);
     assert_eq!(result.data.unwrap()["removed"], true);
 }
+
+#[test]
+fn test_add_member_to_existing_team() {
+    let conn = setup();
+    define_agent(&conn, "dev-1", "DevBot", "sonnet", &["coding"]);
+    tools::teams::create(&serde_json::json!({"name": "dev-team"}), &conn);
+
+    let result = tools::teams::add_member(
+        &serde_json::json!({"team_name": "dev-team", "agent_id": "dev-1", "role": "developer"}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    let data = result.data.unwrap();
+    assert_eq!(data["added"], true);
+    assert_eq!(data["team_name"], "dev-team");
+    assert_eq!(data["agent_id"], "dev-1");
+    assert_eq!(data["role"], "developer");
+}
+
+#[test]
+fn test_add_member_team_not_found() {
+    let conn = setup();
+    define_agent(&conn, "dev-2", "DevBot2", "sonnet", &["coding"]);
+
+    let result = tools::teams::add_member(
+        &serde_json::json!({"team_name": "nonexistent-team", "agent_id": "dev-2"}),
+        &conn,
+    );
+    assert!(!result.ok);
+    let err = result.error.unwrap();
+    assert!(err.contains("team not found"), "expected 'team not found' in: {}", err);
+}
+
+#[test]
+fn test_add_member_already_exists() {
+    let conn = setup();
+    define_agent(&conn, "dev-3", "DevBot3", "sonnet", &["coding"]);
+    tools::teams::create(&serde_json::json!({"name": "dup-team"}), &conn);
+
+    // Add once - should succeed
+    let r1 = tools::teams::add_member(
+        &serde_json::json!({"team_name": "dup-team", "agent_id": "dev-3", "role": "member"}),
+        &conn,
+    );
+    assert!(r1.ok, "first add should succeed: {:?}", r1.error);
+
+    // Add again - should fail
+    let r2 = tools::teams::add_member(
+        &serde_json::json!({"team_name": "dup-team", "agent_id": "dev-3", "role": "member"}),
+        &conn,
+    );
+    assert!(!r2.ok);
+    let err = r2.error.unwrap();
+    assert!(err.contains("already a member"), "expected 'already a member' in: {}", err);
+}
+
+#[test]
+fn test_remove_member() {
+    let conn = setup();
+    define_agent(&conn, "dev-4", "DevBot4", "sonnet", &["coding"]);
+    tools::teams::create(
+        &serde_json::json!({
+            "name": "removable-team",
+            "members": [{"agent_id": "dev-4", "role": "member"}]
+        }),
+        &conn,
+    );
+
+    let result = tools::teams::remove_member(
+        &serde_json::json!({"team_name": "removable-team", "agent_id": "dev-4"}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    let data = result.data.unwrap();
+    assert_eq!(data["removed"], true);
+
+    // Verify member is gone
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM team_members tm JOIN teams t ON tm.team_id = t.id WHERE t.name = 'removable-team'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn test_remove_member_not_found() {
+    let conn = setup();
+    tools::teams::create(&serde_json::json!({"name": "empty-team"}), &conn);
+
+    let result = tools::teams::remove_member(
+        &serde_json::json!({"team_name": "empty-team", "agent_id": "ghost-agent"}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    let data = result.data.unwrap();
+    assert_eq!(data["removed"], false);
+}
