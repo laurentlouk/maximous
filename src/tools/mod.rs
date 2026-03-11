@@ -5,6 +5,8 @@ pub mod agents;
 pub mod changes;
 pub mod sessions;
 pub mod teams;
+pub mod tickets;
+pub mod launches;
 
 use rusqlite::Connection;
 use serde_json::Value;
@@ -51,6 +53,12 @@ pub fn dispatch_tool(name: &str, args: &Value, conn: &Connection) -> ToolResult 
         "team_create" => teams::create(args, conn),
         "team_list" => teams::list(args, conn),
         "team_delete" => teams::delete(args, conn),
+        "ticket_cache" => tickets::cache(args, conn),
+        "ticket_list" => tickets::list(args, conn),
+        "ticket_clear" => tickets::clear(args, conn),
+        "launch_create" => launches::create(args, conn),
+        "launch_update" => launches::update(args, conn),
+        "launch_list" => launches::list(args, conn),
         _ => ToolResult::fail(&format!("Unknown tool: {}", name)),
     }
 }
