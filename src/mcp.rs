@@ -364,6 +364,31 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                 "required": ["name"]
             }),
         },
+        ToolDef {
+            name: "team_add_member".into(),
+            description: "Add an agent to a team with an optional role".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "team_name": {"type": "string", "description": "Name of the team"},
+                    "agent_id": {"type": "string", "description": "Agent definition ID to add"},
+                    "role": {"type": "string", "description": "Optional role for the agent in the team"}
+                },
+                "required": ["team_name", "agent_id"]
+            }),
+        },
+        ToolDef {
+            name: "team_remove_member".into(),
+            description: "Remove an agent from a team".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "team_name": {"type": "string", "description": "Name of the team"},
+                    "agent_id": {"type": "string", "description": "Agent definition ID to remove"}
+                },
+                "required": ["team_name", "agent_id"]
+            }),
+        },
         // --- Tickets ---
         ToolDef {
             name: "ticket_cache".into(),
@@ -460,6 +485,28 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                     "limit": {"type": "integer", "description": "Max results to return", "default": 100},
                     "offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
                 }
+            }),
+        },
+        ToolDef {
+            name: "launch_delete".into(),
+            description: "Delete a launch record".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "Launch ID to delete"}
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDef {
+            name: "ticket_get".into(),
+            description: "Get a single cached ticket by ID".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "Ticket ID"}
+                },
+                "required": ["id"]
             }),
         },
     ]

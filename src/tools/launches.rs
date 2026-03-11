@@ -107,6 +107,18 @@ pub fn update(args: &Value, conn: &Connection) -> ToolResult {
     }
 }
 
+pub fn delete(args: &Value, conn: &Connection) -> ToolResult {
+    let id = match args["id"].as_str() {
+        Some(s) => s,
+        None => return ToolResult::fail("missing required field: id"),
+    };
+
+    match conn.execute("DELETE FROM launches WHERE id = ?1", rusqlite::params![id]) {
+        Ok(deleted) => ToolResult::success(serde_json::json!({"removed": deleted > 0})),
+        Err(e) => ToolResult::fail(&format!("db error: {}", e)),
+    }
+}
+
 pub fn list(args: &Value, conn: &Connection) -> ToolResult {
     let status = args["status"].as_str();
     let limit = args["limit"].as_i64().unwrap_or(100);

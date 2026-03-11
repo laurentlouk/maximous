@@ -53,12 +53,16 @@ pub fn dispatch_tool(name: &str, args: &Value, conn: &Connection) -> ToolResult 
         "team_create" => teams::create(args, conn),
         "team_list" => teams::list(args, conn),
         "team_delete" => teams::delete(args, conn),
+        "team_add_member" => teams::add_member(args, conn),
+        "team_remove_member" => teams::remove_member(args, conn),
         "ticket_cache" => tickets::cache(args, conn),
         "ticket_list" => tickets::list(args, conn),
         "ticket_clear" => tickets::clear(args, conn),
         "launch_create" => launches::create(args, conn),
         "launch_update" => launches::update(args, conn),
         "launch_list" => launches::list(args, conn),
+        "launch_delete" => launches::delete(args, conn),
+        "ticket_get" => tickets::get(args, conn),
         _ => ToolResult::fail(&format!("Unknown tool: {}", name)),
     }
 }

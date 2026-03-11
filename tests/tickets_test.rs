@@ -273,6 +273,37 @@ fn test_ticket_cache_missing_status() {
 }
 
 #[test]
+fn test_ticket_get() {
+    let conn = setup();
+    cache_ticket(&conn, "t-get-1", "linear", "ENG-500", "Fetch me", "in_progress");
+
+    let result = tools::tickets::get(
+        &serde_json::json!({"id": "t-get-1"}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    let data = result.data.unwrap();
+    let ticket = &data["ticket"];
+    assert_eq!(ticket["id"], "t-get-1");
+    assert_eq!(ticket["source"], "linear");
+    assert_eq!(ticket["external_id"], "ENG-500");
+    assert_eq!(ticket["title"], "Fetch me");
+    assert_eq!(ticket["status"], "in_progress");
+}
+
+#[test]
+fn test_ticket_get_not_found() {
+    let conn = setup();
+
+    let result = tools::tickets::get(
+        &serde_json::json!({"id": "nonexistent-ticket"}),
+        &conn,
+    );
+    assert!(!result.ok);
+    assert!(result.error.unwrap().contains("not found"));
+}
+
+#[test]
 fn test_ticket_list_priority_ordering() {
     let conn = setup();
     // Insert with different priorities

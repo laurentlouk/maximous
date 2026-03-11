@@ -338,6 +338,48 @@ fn test_launch_list_pagination() {
 }
 
 #[test]
+fn test_launch_delete() {
+    let conn = setup();
+    seed_agent(&conn, "agent-1");
+    let team_id = seed_team(&conn, "backend");
+    seed_ticket(&conn, "ticket-1", "Fix the bug");
+
+    let create_result = tools::launches::create(
+        &serde_json::json!({
+            "ticket_id": "ticket-1",
+            "team_id": team_id,
+            "branch": "fix/bug-123",
+        }),
+        &conn,
+    );
+    assert!(create_result.ok);
+    let launch_id = create_result.data.unwrap()["launch"]["id"].as_str().unwrap().to_string();
+
+    let result = tools::launches::delete(
+        &serde_json::json!({"id": launch_id}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    assert_eq!(result.data.unwrap()["removed"], true);
+
+    // Verify it's gone
+    let list_result = tools::launches::list(&serde_json::json!({}), &conn);
+    assert_eq!(list_result.data.unwrap()["count"], 0);
+}
+
+#[test]
+fn test_launch_delete_not_found() {
+    let conn = setup();
+
+    let result = tools::launches::delete(
+        &serde_json::json!({"id": "nonexistent-id"}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    assert_eq!(result.data.unwrap()["removed"], false);
+}
+
+#[test]
 fn test_dispatch_launch_tools() {
     let conn = setup();
     seed_agent(&conn, "agent-1");
