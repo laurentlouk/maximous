@@ -1,6 +1,6 @@
 [package]
 name = "maximous"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "SQLite brain for Claude Code — session continuity, subagent knowledge persistence, multi-instance awareness, FTS5 search, typed observations, and web dashboard"
 license = "MIT"

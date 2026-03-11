@@ -1,7 +1,7 @@
 {
   "name": "maximous",
-  "version": "0.5.0",
-  "description": "SQLite brain for Claude Code — session continuity, subagent knowledge persistence, multi-instance awareness, FTS5 search, typed observations, privacy tags, web dashboard, and real-time SSE updates",
+  "version": "0.6.0",
+  "description": "SQLite brain for Claude Code — agent registry, teams, ticket integration (Linear/Jira), parallel launch tracking, session continuity, FTS5 search, typed observations, web dashboard with real-time SSE",
   "author": {
     "name": "Laurent",
     "url": "https://github.com/awesome-lab/maximous"
