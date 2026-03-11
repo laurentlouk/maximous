@@ -8,6 +8,43 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/ensure-db.sh",
             "timeout": 10
+          },
+          {
+            "type": "prompt",
+            "prompt": "Maximous session continuity is active. Previous session context may exist in maximous memory. If the user's request relates to prior work, use memory_search with query relevant to their request to find context from previous sessions. Check namespace 'sessions' for recent session summaries, and 'agent-findings' for preserved subagent research."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Session is ending. Save a structured summary of this session to maximous:\n1. Use memory_set with namespace='sessions', key=YYYY-MM-DD-<brief-topic>, observation_type='insight', category='workflow'\n2. Include in the value: what was accomplished, key decisions made, files changed, and any unfinished work or next steps\n3. If there are pending tasks, update their status in maximous using task_update\nKeep the summary concise but complete enough for a future session to pick up where this left off."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "A subagent just completed work. Subagent context will be compressed to a brief summary and detailed findings will be lost. If the subagent produced valuable research, analysis, or decisions:\n1. Use memory_set with namespace='agent-findings', key=<descriptive-key>, observation_type='insight'\n2. Store the detailed findings, not just the summary — include specifics like file paths, code patterns, architectural decisions, or research results\n3. Tag with category matching the domain (architecture, debugging, api, etc.)\nThis preserves rich context that future sessions and agents can access."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Context window is about to be compressed. Before compression, check if there is important in-progress context that should be preserved:\n1. Key findings or research results not yet saved\n2. Complex state or decisions that would be hard to reconstruct\n3. Partial work that needs continuity\nUse memory_set with namespace='context-preservation' and a descriptive key to save anything critical. Use ttl_seconds=86400 (24h) so stale context auto-expires."
           }
         ]
       }

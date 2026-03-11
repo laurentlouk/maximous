@@ -17,6 +17,12 @@ Organize data with namespaces to avoid key collisions:
 - `agent-state` — per-agent state snapshots
 - `shared` — general-purpose shared data
 
+**Reserved namespaces** (used automatically by session continuity hooks):
+
+- `sessions` — session summaries saved at session end
+- `agent-findings` — detailed subagent research preserved after completion
+- `context-preservation` — state saved before context compression (24h TTL)
+
 ## Writing
 
 ```

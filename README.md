@@ -1,8 +1,8 @@
 # Maximous
 
-A SQLite brain for multi-agent orchestration with FTS5 search, typed observations, session tracking, and a built-in web dashboard. Single Rust binary, zero runtime dependencies.
+A SQLite brain for Claude Code — session continuity, subagent knowledge persistence, multi-instance awareness, and multi-agent orchestration. Single Rust binary, zero runtime dependencies.
 
-Maximous gives Claude Code agents (sub-agents, team agents, parallel agents) a shared database for coordination, communication, and knowledge sharing via the MCP protocol.
+Maximous enhances Claude Code with persistent context that survives across sessions, preserves subagent findings before they're compressed, and coordinates parallel agents through a shared SQLite database via MCP.
 
 <p align="center">
   <img src="assets/dashboard-overview.png" alt="Maximous Web Dashboard" width="800">
@@ -50,8 +50,15 @@ Tag memory entries with `observation_type` (decision, error, preference, insight
 ### Privacy Tags
 Wrap sensitive data in `<private>...</private>` tags. It's stored in the database but redacted to `[REDACTED]` on all read operations.
 
-### Session Tracking
-Track agent work sessions with start/end timestamps, summaries, and per-agent filtering.
+### Session Continuity
+Automatic hooks preserve context across Claude Code sessions:
+
+- **SessionStart** — loads previous session context from maximous memory
+- **SessionEnd** — saves structured summary of what was accomplished
+- **SubagentStop** — preserves detailed subagent findings before context compression
+- **PreCompact** — saves critical in-progress state before context window compression
+
+Reserved namespaces: `sessions`, `agent-findings`, `context-preservation`.
 
 ### Web Dashboard
 Built-in web dashboard at `http://127.0.0.1:8375` with 7 views:
@@ -147,10 +154,11 @@ Claude Code auto-spawns the MCP server and makes all 18 tools available to agent
 
 ### Skills
 
-The plugin includes 7 skills that teach agents how to use maximous. Skills trigger automatically based on what you say:
+The plugin includes 8 skills that teach agents how to use maximous. Skills trigger automatically based on what you say:
 
 | Skill | Trigger examples | Purpose |
 |---|---|---|
+| **session-continuity** | "resume previous work", "pick up where I left off" | Cross-session context persistence |
 | **orchestrate** | "orchestrate agents", "set up multi-agent workflow" | Set up full multi-agent workflows |
 | **coordinate** | "manage tasks", "create task graph" | Task lifecycle and dependency management |
 | **communicate** | "send a message to agents", "use message channels" | Message channels and priority queues |
@@ -161,13 +169,18 @@ The plugin includes 7 skills that teach agents how to use maximous. Skills trigg
 
 ### When Does Maximous Activate?
 
-Maximous tools are available in every session but Claude only uses them when there's a reason to. In practice, maximous becomes useful when you:
+Maximous hooks run automatically in every session:
+
+- **Session continuity** — summaries are saved at session end and loaded at session start, so Claude can pick up where it left off
+- **Subagent persistence** — when subagents finish, their detailed findings are preserved in memory before context compression discards them
+- **Context preservation** — before the context window is compressed, important in-progress state is saved
+
+Beyond automatic hooks, maximous is also used when you:
 
 - **Run parallel subagents** that need to share data
 - **Set up task graphs** with dependencies between agents
 - **Need agents to communicate** with each other via message channels
 - **Want to observe** when another agent finishes a task
-- **Need persistent memory** with full-text search across sessions
 
 ### Standalone
 
@@ -190,7 +203,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 Should return:
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"maximous","version":"0.3.0"}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"maximous","version":"0.5.0"}}}
 ```
 
 ## Multi-Agent Example
@@ -231,8 +244,8 @@ maximous/
 ├── .claude-plugin/      # Plugin manifest
 │   └── plugin.json
 ├── .mcp.json            # MCP server config
-├── skills/              # 7 agent skills
-├── hooks/               # SessionStart hook
+├── skills/              # 8 agent skills
+├── hooks/               # SessionStart, SessionEnd, SubagentStop, PreCompact hooks
 ├── scripts/             # Launcher, installer, db init
 ├── web/                 # Dashboard frontend (compiled into binary)
 │   ├── index.html
@@ -367,8 +380,8 @@ Benchmarks cover:
 Tag a version to trigger cross-platform builds and a GitHub Release:
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 GitHub Actions builds binaries for macOS (arm64, x86_64) and Linux (arm64, x86_64), then creates a release with the tarballs attached.

@@ -1,7 +1,7 @@
 {
   "name": "maximous",
-  "version": "0.4.1",
-  "description": "SQLite brain for multi-agent orchestration — FTS5 search, typed observations, progressive disclosure, privacy tags, session tracking, web dashboard, and real-time SSE updates",
+  "version": "0.5.0",
+  "description": "SQLite brain for Claude Code — session continuity, subagent knowledge persistence, multi-instance awareness, FTS5 search, typed observations, privacy tags, web dashboard, and real-time SSE updates",
   "author": {
     "name": "Laurent",
     "url": "https://github.com/awesome-lab/maximous"
