@@ -37,6 +37,7 @@ pub fn create_router(db: DbState) -> Router {
         .route("/api/launches", post(api::create_launch))
         .route("/api/launches/:id", axum::routing::put(api::update_launch))
         .route("/api/launches/:id", delete(api::delete_launch))
+        .route("/api/launches/:id/execute", post(api::execute_launch))
         .route("/api/memory", get(api::memory))
         .route("/api/sessions", get(api::sessions))
         .route("/api/changes", get(api::changes))

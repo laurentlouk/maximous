@@ -597,3 +597,148 @@ pub async fn delete_launch(
     let result = crate::tools::launches::delete(&args, &conn);
     Json(json!({"ok": result.ok, "data": result.data, "error": result.error}))
 }
+
+pub async fn execute_launch(
+    State(db): State<DbState>,
+    Path(id): Path<String>,
+) -> Json<Value> {
+    let conn = db.lock().unwrap();
+
+    // Fetch launch + ticket + team details
+    let launch_info = conn.query_row(
+        "SELECT l.id, l.ticket_id, l.team_id, l.branch, t.title, t.url, t.source, t.status,
+                tm.name AS team_name
+         FROM launches l
+         LEFT JOIN tickets t ON l.ticket_id = t.id
+         LEFT JOIN teams tm ON l.team_id = tm.id
+         WHERE l.id = ?1",
+        rusqlite::params![id],
+        |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "ticket_id": row.get::<_, Option<String>>(1)?,
+                "team_id": row.get::<_, Option<String>>(2)?,
+                "branch": row.get::<_, Option<String>>(3)?,
+                "ticket_title": row.get::<_, Option<String>>(4)?,
+                "ticket_url": row.get::<_, Option<String>>(5)?,
+                "ticket_source": row.get::<_, Option<String>>(6)?,
+                "ticket_status": row.get::<_, Option<String>>(7)?,
+                "team_name": row.get::<_, Option<String>>(8)?,
+            }))
+        },
+    );
+
+    let info = match launch_info {
+        Ok(v) => v,
+        Err(_) => return Json(json!({"ok": false, "error": "launch not found"})),
+    };
+
+    // Get team members
+    let team_id = info["team_id"].as_str().unwrap_or("");
+    let members: Vec<(String, String, String)> = if !team_id.is_empty() {
+        let mut stmt = conn.prepare(
+            "SELECT tm.agent_id, ad.name, ad.model
+             FROM team_members tm
+             LEFT JOIN agent_definitions ad ON tm.agent_id = ad.id
+             WHERE tm.team_id = ?1"
+        ).unwrap();
+        stmt.query_map(rusqlite::params![team_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+            ))
+        }).unwrap().filter_map(|r| r.ok()).collect()
+    } else {
+        Vec::new()
+    };
+
+    // Update launch status to running
+    let _ = conn.execute(
+        "UPDATE launches SET status = 'running', updated_at = strftime('%s', 'now') WHERE id = ?1",
+        rusqlite::params![id],
+    );
+
+    drop(conn); // Release the lock before spawning
+
+    // Build the prompt
+    let ticket_title = info["ticket_title"].as_str().unwrap_or("Unknown ticket");
+    let ticket_url = info["ticket_url"].as_str().unwrap_or("");
+    let team_name = info["team_name"].as_str().unwrap_or("Unknown team");
+    let branch = info["branch"].as_str().unwrap_or("");
+    let launch_id = info["id"].as_str().unwrap_or(&id);
+
+    let members_desc = if members.is_empty() {
+        String::new()
+    } else {
+        let list: Vec<String> = members.iter().map(|(id, name, model)| {
+            format!("- {} ({}, model: {})", name, id, model)
+        }).collect();
+        format!("\nTeam members:\n{}", list.join("\n"))
+    };
+
+    let ticket_ref = if ticket_url.is_empty() {
+        ticket_title.to_string()
+    } else {
+        format!("{}\nURL: {}", ticket_title, ticket_url)
+    };
+
+    let prompt = format!(
+        "You are an orchestrator for team \"{}\" working on a launch.\n\
+         {}\n\
+         Ticket: {}\n\
+         Branch: {}\n\
+         Launch ID: {}\n\n\
+         INSTRUCTIONS:\n\
+         1. Use /maximous:orchestrate to coordinate this work\n\
+         2. Start a maximous session (session_start) for this launch\n\
+         3. Break down the ticket into tasks (task_create) and assign them to team members\n\
+         4. Use the Agent tool to dispatch sub-agents for each team member's tasks\n\
+         5. Each sub-agent should use maximous tools (agent_heartbeat, task_update) to report progress\n\
+         6. When all tasks are done, update the launch status to 'done' (launch_update)\n\
+         7. Create a PR if code changes were made\n\n\
+         The maximous dashboard is watching — all activities, tasks, and agent statuses will be visible in real-time.\n\
+         Start by understanding the ticket, then plan and execute.",
+        team_name, members_desc, ticket_ref, branch, launch_id
+    );
+
+    // Write prompt to a temp file to avoid shell escaping issues
+    let prompt_file = format!("/tmp/maximous-launch-{}.txt", id);
+    if let Err(e) = std::fs::write(&prompt_file, &prompt) {
+        return Json(json!({"ok": false, "error": format!("failed to write prompt file: {}", e)}));
+    }
+
+    // Get the current working directory (project root)
+    let cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| ".".to_string());
+
+    let escaped_branch = branch.replace('\'', "'\\''");
+
+    // Build the shell command: checkout branch, then run claude with the prompt
+    let shell_cmd = format!(
+        "cd '{cwd}' && git checkout -b '{branch}' 2>/dev/null; git checkout '{branch}' 2>/dev/null; claude < '{prompt_file}'",
+        cwd = cwd,
+        branch = escaped_branch,
+        prompt_file = prompt_file,
+    );
+
+    // Use osascript on macOS to open a new Terminal tab
+    let apple_script = format!(
+        "tell application \"Terminal\"\n\
+           activate\n\
+           do script \"{}\"\n\
+         end tell",
+        shell_cmd.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+
+    let result = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&apple_script)
+        .spawn();
+
+    match result {
+        Ok(_) => Json(json!({"ok": true, "message": "Claude Code launched in new terminal"})),
+        Err(e) => Json(json!({"ok": false, "error": format!("failed to open terminal: {}", e)})),
+    }
+}

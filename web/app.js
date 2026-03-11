@@ -434,21 +434,38 @@ async function loadTickets() {
                 var teamId = select.value;
                 if (!teamId) { alert('Select a team first'); return; }
                 this.disabled = true;
-                this.textContent = '...';
+                this.textContent = 'Launching...';
+                // Step 1: Create the launch
                 var resp = await fetch(API + '/api/launches', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ticket_id: ticketId, team_id: teamId }),
                 });
                 var result = await resp.json();
-                if (result.ok) {
-                    this.textContent = 'Launched!';
-                    setTimeout(function() { renderTickets(url); }, 1000);
-                } else {
+                if (!result.ok) {
                     alert('Error: ' + (result.error || 'Unknown error'));
                     this.disabled = false;
                     this.textContent = 'Launch';
+                    return;
                 }
+                // Step 2: Execute — opens Claude Code in a new terminal
+                var launchId = result.data && result.data.launch && result.data.launch.id;
+                if (launchId) {
+                    var execResp = await fetch(API + '/api/launches/' + encodeURIComponent(launchId) + '/execute', {
+                        method: 'POST',
+                    });
+                    var execResult = await execResp.json();
+                    if (execResult.ok) {
+                        this.textContent = 'Running';
+                        this.classList.add('btn-running');
+                    } else {
+                        this.textContent = 'Launched';
+                        console.error('Execute error:', execResult.error);
+                    }
+                } else {
+                    this.textContent = 'Launched';
+                }
+                setTimeout(function() { renderTickets(url); }, 2000);
             });
         });
     }
