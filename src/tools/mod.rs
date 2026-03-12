@@ -62,6 +62,7 @@ pub fn dispatch_tool(name: &str, args: &Value, conn: &Connection) -> ToolResult 
         "launch_update" => launches::update(args, conn),
         "launch_list" => launches::list(args, conn),
         "launch_delete" => launches::delete(args, conn),
+        "launch_wait" => launches::wait(args, conn),
         "ticket_get" => tickets::get(args, conn),
         _ => ToolResult::fail(&format!("Unknown tool: {}", name)),
     }

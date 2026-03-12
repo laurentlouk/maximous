@@ -5,25 +5,33 @@ description: This skill should be used when the user wants to "listen for launch
 
 # Launch Listener
 
-Poll for pending launches from the maximous dashboard and dispatch them as background agents with worktree isolation.
+Listen for pending launches from the maximous dashboard and dispatch them as background agents with worktree isolation.
+
+> Uses server-push via `launch_wait` — no polling, no sleeping. The tool blocks until a launch appears, keeping the session responsive.
 
 ## How It Works
 
 1. The dashboard creates launches with status `"pending"` when the user clicks "Launch"
-2. This Claude Code session polls `launch_list(status="pending")` on an interval
+2. This Claude Code session calls `launch_wait` which blocks until a launch is queued
 3. For each pending launch, call the execute API to get full context (ticket, team, members)
 4. Dispatch an Agent with `isolation: "worktree"` and `run_in_background: true`
 5. The agent works independently in its own worktree — no interference with main session
 
 ## Steps
 
-### 1. Poll for pending launches
+### 1. Wait for pending launches
 
 Use the maximous MCP tool:
 
 ```
-launch_list(status="pending")
+launch_wait(timeout=120)
 ```
+
+This blocks server-side until a pending launch appears (or the timeout expires). No sleep or polling needed.
+
+The response includes a `cursor` value. Save it — you will pass it as `since_id` on your next call so you only receive launches queued after this point.
+
+If the response contains `timed_out: true`, no new launch was found within the timeout window. Simply call `launch_wait` again with the same `since_id` cursor.
 
 ### 2. For each pending launch, get full context
 
@@ -54,9 +62,14 @@ The prompt should include:
 - Launch ID
 - Instructions to use `/maximous:orchestrate`, create tasks, dispatch sub-agents, and update launch status when done
 
-### 4. Loop
+### 4. Wait for next launch
 
-Use the `/loop` skill to repeat every 30 seconds, or poll manually.
+Call `launch_wait(since_id=<cursor>)` again — it blocks until the next launch is queued.
+
+- No sleep needed, no `/loop` needed
+- The tool returns immediately if a launch is already pending
+- On timeout (`timed_out: true`), just call again with the same cursor
+- Each response returns a new `cursor` — always use the latest one for `since_id`
 
 ## Example orchestration prompt template
 

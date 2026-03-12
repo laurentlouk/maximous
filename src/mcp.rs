@@ -500,6 +500,17 @@ pub fn tool_definitions() -> Vec<ToolDef> {
             }),
         },
         ToolDef {
+            name: "launch_wait".into(),
+            description: "Block until a new pending launch appears. Returns immediately if one exists. Use instead of polling launch_list.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "timeout": {"type": "integer", "description": "Max seconds to wait (default 120, max 300)", "default": 120},
+                    "since_id": {"type": "integer", "description": "Only detect changes after this ID (cursor from previous call)", "default": 0}
+                }
+            }),
+        },
+        ToolDef {
             name: "ticket_get".into(),
             description: "Get a single cached ticket by ID".into(),
             input_schema: serde_json::json!({

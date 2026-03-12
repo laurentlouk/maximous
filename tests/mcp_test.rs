@@ -82,6 +82,8 @@ fn test_tool_list_contains_all_tools() {
     // Single ticket fetch
     assert!(names.contains(&"ticket_get"));
 
-    // Total: 15 existing (minus 3 message) + 12 new + 4 extras = 31
-    assert_eq!(tools.len(), 31);
+    // launch_wait (server-push for launch listener)
+    assert!(names.contains(&"launch_wait"));
+
+    assert_eq!(tools.len(), 32);
 }

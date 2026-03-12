@@ -441,3 +441,100 @@ fn test_dispatch_launch_tools() {
     assert!(list_result.ok);
     assert_eq!(list_result.data.unwrap()["count"], 1);
 }
+
+#[test]
+fn test_launch_wait_timeout() {
+    let conn = setup();
+
+    // No launches exist — should timeout
+    let result = tools::launches::wait(
+        &serde_json::json!({"timeout": 1}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    let data = result.data.unwrap();
+    assert_eq!(data["timed_out"], true);
+    assert_eq!(data["launches"].as_array().unwrap().len(), 0);
+    assert!(data["cursor"].as_i64().is_some());
+}
+
+#[test]
+fn test_launch_wait_finds_pending() {
+    let conn = setup();
+    seed_agent(&conn, "agent-1");
+    let team_id = seed_team(&conn, "backend");
+    seed_ticket(&conn, "ticket-1", "Fix the bug");
+
+    // Snapshot the current change cursor before creating a launch
+    let cursor: i64 = conn
+        .query_row("SELECT COALESCE(MAX(id), 0) FROM changes", [], |row| row.get(0))
+        .unwrap();
+
+    // Create a pending launch (triggers a change entry)
+    let create_result = tools::launches::create(
+        &serde_json::json!({
+            "ticket_id": "ticket-1",
+            "team_id": team_id,
+            "branch": "fix/bug-123",
+        }),
+        &conn,
+    );
+    assert!(create_result.ok);
+
+    // Wait should find it immediately
+    let result = tools::launches::wait(
+        &serde_json::json!({"timeout": 2, "since_id": cursor}),
+        &conn,
+    );
+    assert!(result.ok, "expected ok, got: {:?}", result.error);
+    let data = result.data.unwrap();
+    assert_eq!(data["timed_out"], false);
+    let launches = data["launches"].as_array().unwrap();
+    assert_eq!(launches.len(), 1);
+    assert_eq!(launches[0]["ticket_title"], "Fix the bug");
+    assert_eq!(launches[0]["team_name"], "backend");
+    assert_eq!(launches[0]["status"], "pending");
+    assert!(data["cursor"].as_i64().unwrap() > cursor);
+}
+
+#[test]
+fn test_launch_wait_ignores_stale_when_since_id_zero() {
+    let conn = setup();
+    seed_agent(&conn, "agent-1");
+    let team_id = seed_team(&conn, "backend");
+    seed_ticket(&conn, "ticket-1", "Old launch");
+
+    // Create a launch before calling wait — this is "stale"
+    tools::launches::create(
+        &serde_json::json!({
+            "ticket_id": "ticket-1",
+            "team_id": team_id,
+            "branch": "old/branch",
+        }),
+        &conn,
+    );
+
+    // since_id=0 defaults to current max change ID, so it should NOT pick up the old launch
+    let result = tools::launches::wait(
+        &serde_json::json!({"timeout": 1, "since_id": 0}),
+        &conn,
+    );
+    assert!(result.ok);
+    let data = result.data.unwrap();
+    assert_eq!(data["timed_out"], true);
+    assert_eq!(data["launches"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn test_launch_wait_dispatch() {
+    let conn = setup();
+
+    // Verify launch_wait is routable via dispatch_tool
+    let result = tools::dispatch_tool(
+        "launch_wait",
+        &serde_json::json!({"timeout": 1}),
+        &conn,
+    );
+    assert!(result.ok);
+    assert_eq!(result.data.unwrap()["timed_out"], true);
+}
