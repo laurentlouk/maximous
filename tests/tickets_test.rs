@@ -353,6 +353,156 @@ fn test_ticket_list_priority_ordering() {
     assert_eq!(tickets[2]["priority"], 3);
 }
 
+// --- Jira-specific tests ---
+
+#[test]
+fn test_jira_ticket_cache_full_format() {
+    let conn = setup();
+    let result = tools::tickets::cache(
+        &serde_json::json!({
+            "id": "ESTUDY-920",
+            "source": "jira",
+            "external_id": "ESTUDY-920",
+            "title": "Implement OAuth2 login flow",
+            "status": "In Progress",
+            "description": "Add OAuth2 support for third-party login",
+            "assignee": "jane.doe",
+            "priority": 1,
+            "labels": ["auth", "backend"],
+            "url": "https://mycompany.atlassian.net/browse/ESTUDY-920",
+            "metadata": {"sprint": "Sprint 12", "story_points": 5}
+        }),
+        &conn,
+    );
+    assert!(result.ok, "cache jira ticket failed: {:?}", result.error);
+
+    // Verify all fields round-trip correctly via get
+    let get_result = tools::tickets::get(&serde_json::json!({"id": "ESTUDY-920"}), &conn);
+    assert!(get_result.ok);
+    let ticket = &get_result.data.unwrap()["ticket"];
+    assert_eq!(ticket["id"], "ESTUDY-920");
+    assert_eq!(ticket["source"], "jira");
+    assert_eq!(ticket["external_id"], "ESTUDY-920");
+    assert_eq!(ticket["title"], "Implement OAuth2 login flow");
+    assert_eq!(ticket["status"], "In Progress");
+    assert_eq!(ticket["description"], "Add OAuth2 support for third-party login");
+    assert_eq!(ticket["assignee"], "jane.doe");
+    assert_eq!(ticket["priority"], 1);
+    assert_eq!(ticket["url"], "https://mycompany.atlassian.net/browse/ESTUDY-920");
+
+    // labels and metadata are stored as JSON strings
+    let labels: Vec<String> = serde_json::from_str(ticket["labels"].as_str().unwrap()).unwrap();
+    assert_eq!(labels, vec!["auth", "backend"]);
+    let metadata: serde_json::Value = serde_json::from_str(ticket["metadata"].as_str().unwrap()).unwrap();
+    assert_eq!(metadata["sprint"], "Sprint 12");
+    assert_eq!(metadata["story_points"], 5);
+}
+
+#[test]
+fn test_jira_ticket_minimal_required_fields() {
+    let conn = setup();
+    let result = tools::tickets::cache(
+        &serde_json::json!({
+            "id": "PROJ-100",
+            "source": "jira",
+            "external_id": "PROJ-100",
+            "title": "Fix null pointer in parser",
+            "status": "Done",
+        }),
+        &conn,
+    );
+    assert!(result.ok, "cache minimal jira ticket failed: {:?}", result.error);
+
+    let get_result = tools::tickets::get(&serde_json::json!({"id": "PROJ-100"}), &conn);
+    assert!(get_result.ok);
+    let ticket = &get_result.data.unwrap()["ticket"];
+    assert_eq!(ticket["source"], "jira");
+    assert_eq!(ticket["status"], "Done");
+    // Defaults for optional fields
+    assert_eq!(ticket["description"], "");
+    assert_eq!(ticket["assignee"], "");
+    assert_eq!(ticket["priority"], 2);
+    assert_eq!(ticket["url"], "");
+}
+
+#[test]
+fn test_jira_ticket_upsert_preserves_source() {
+    let conn = setup();
+    cache_ticket(&conn, "ESTUDY-500", "jira", "ESTUDY-500", "Original", "To Do");
+
+    // Upsert with updated status
+    let result = tools::tickets::cache(
+        &serde_json::json!({
+            "id": "ESTUDY-500",
+            "source": "jira",
+            "external_id": "ESTUDY-500",
+            "title": "Original",
+            "status": "In Review",
+        }),
+        &conn,
+    );
+    assert!(result.ok);
+
+    let get_result = tools::tickets::get(&serde_json::json!({"id": "ESTUDY-500"}), &conn);
+    let ticket = &get_result.data.unwrap()["ticket"];
+    assert_eq!(ticket["source"], "jira");
+    assert_eq!(ticket["status"], "In Review");
+}
+
+#[test]
+fn test_jira_tickets_filter_excludes_linear() {
+    let conn = setup();
+    cache_ticket(&conn, "ESTUDY-1", "jira", "ESTUDY-1", "Jira ticket 1", "To Do");
+    cache_ticket(&conn, "ESTUDY-2", "jira", "ESTUDY-2", "Jira ticket 2", "In Progress");
+    cache_ticket(&conn, "ENG-1", "linear", "ENG-1", "Linear ticket", "todo");
+
+    let result = tools::tickets::list(&serde_json::json!({"source": "jira"}), &conn);
+    assert!(result.ok);
+    let data = result.data.unwrap();
+    assert_eq!(data["count"], 2);
+    for ticket in data["tickets"].as_array().unwrap() {
+        assert_eq!(ticket["source"], "jira");
+    }
+}
+
+#[test]
+fn test_jira_ticket_with_url() {
+    let conn = setup();
+    let result = tools::tickets::cache(
+        &serde_json::json!({
+            "id": "PROJ-42",
+            "source": "jira",
+            "external_id": "PROJ-42",
+            "title": "Add dark mode",
+            "status": "Backlog",
+            "url": "https://mycompany.atlassian.net/browse/PROJ-42",
+        }),
+        &conn,
+    );
+    assert!(result.ok);
+
+    let get_result = tools::tickets::get(&serde_json::json!({"id": "PROJ-42"}), &conn);
+    let ticket = &get_result.data.unwrap()["ticket"];
+    assert_eq!(ticket["url"], "https://mycompany.atlassian.net/browse/PROJ-42");
+}
+
+#[test]
+fn test_jira_clear_only_jira() {
+    let conn = setup();
+    cache_ticket(&conn, "ESTUDY-10", "jira", "ESTUDY-10", "Jira task", "To Do");
+    cache_ticket(&conn, "ENG-10", "linear", "ENG-10", "Linear task", "todo");
+
+    let result = tools::tickets::clear(&serde_json::json!({"source": "jira"}), &conn);
+    assert!(result.ok);
+    assert_eq!(result.data.unwrap()["cleared"], 1);
+
+    // Linear ticket should remain
+    let list_result = tools::tickets::list(&serde_json::json!({}), &conn);
+    let data = list_result.data.unwrap();
+    assert_eq!(data["count"], 1);
+    assert_eq!(data["tickets"][0]["source"], "linear");
+}
+
 #[test]
 fn test_ticket_get_includes_assignee() {
     let conn = setup();

@@ -421,6 +421,52 @@ td.empty {
     color: var(--text-primary);
 }
 
+.channel-tab.active {
+    border-color: var(--accent);
+    background: rgba(79, 195, 247, 0.15);
+    color: var(--accent);
+}
+
+/* Source toggle */
+.source-toggle {
+    display: inline-flex;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+}
+
+.source-btn {
+    padding: 0.5rem 1.25rem;
+    border: none;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.source-btn:not(:last-child) {
+    border-right: 1px solid var(--border);
+}
+
+.source-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.source-btn.active[data-source="linear"] {
+    background: rgba(99, 91, 255, 0.15);
+    color: #635bff;
+}
+
+.source-btn.active[data-source="jira"] {
+    background: rgba(0, 82, 204, 0.15);
+    color: #0052cc;
+}
+
 .messages-list {
     display: flex;
     flex-direction: column;

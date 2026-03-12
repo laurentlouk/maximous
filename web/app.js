@@ -411,7 +411,7 @@ async function loadTickets() {
                   '</div>'
                 : '-';
             return '<tr>' +
-                '<td>' + badge(escapeHtml(t.source || '-'), (t.source || '').toLowerCase()) + '</td>' +
+                '<td>' + escapeHtml(t.external_id || t.id || '-') + '</td>' +
                 '<td>' + titleCell + '</td>' +
                 '<td>' + badge(escapeHtml(t.status || '-'), (t.status || '').toLowerCase()) + '</td>' +
                 '<td>' + escapeHtml(t.assignee || '-') + '</td>' +
@@ -422,7 +422,7 @@ async function loadTickets() {
         }).join('');
         setContent(el.querySelector('.tickets-table-container'),
             '<div class="table-container">' +
-                '<table><thead><tr><th>Source</th><th>Title</th><th>Status</th><th>Assignee</th><th>Priority</th><th>Labels</th><th>Launch</th></tr></thead>' +
+                '<table><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Assignee</th><th>Priority</th><th>Labels</th><th>Launch</th></tr></thead>' +
                 '<tbody>' + (rows || '<tr><td colspan="7" class="empty">No tickets</td></tr>') + '</tbody></table>' +
             '</div>');
 
@@ -456,12 +456,26 @@ async function loadTickets() {
 
     setContent(el,
         '<div class="section-header"><h2>Tickets</h2><button class="btn-create" id="btn-refresh-tickets">Refresh</button></div>' +
+        '<div class="source-toggle" id="ticket-source-toggle">' +
+            '<button class="source-btn active" data-source="linear">Linear</button>' +
+            '<button class="source-btn" data-source="jira">Jira</button>' +
+        '</div>' +
         '<div class="tickets-table-container"></div>');
 
-    await renderTickets('/api/tickets');
+    var activeSource = 'linear';
+    await renderTickets('/api/tickets?source=linear');
 
     document.getElementById('btn-refresh-tickets').addEventListener('click', function() {
-        renderTickets('/api/tickets');
+        renderTickets('/api/tickets?source=' + activeSource);
+    });
+
+    el.querySelectorAll('#ticket-source-toggle .source-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            el.querySelectorAll('#ticket-source-toggle .source-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            activeSource = btn.dataset.source;
+            renderTickets('/api/tickets?source=' + activeSource);
+        });
     });
 }
 
