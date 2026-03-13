@@ -487,6 +487,33 @@ pub async fn create_agent_definition(
     Json(json!({"ok": result.ok, "data": result.data, "error": result.error}))
 }
 
+pub async fn update_agent_definition(
+    State(db): State<DbState>,
+    Path(id): Path<String>,
+    Json(body): Json<CreateAgentDefinitionBody>,
+) -> Json<Value> {
+    let args = json!({
+        "id": id,
+        "name": body.name,
+        "capabilities": body.capabilities.unwrap_or_default(),
+        "model": body.model.unwrap_or_else(|| "sonnet".to_string()),
+        "prompt_hint": body.prompt_hint.unwrap_or_default(),
+    });
+    let conn = db.lock().unwrap();
+    let result = crate::tools::definitions::define(&args, &conn);
+    Json(json!({"ok": result.ok, "data": result.data, "error": result.error}))
+}
+
+pub async fn delete_agent_definition(
+    State(db): State<DbState>,
+    Path(id): Path<String>,
+) -> Json<Value> {
+    let args = json!({ "id": id });
+    let conn = db.lock().unwrap();
+    let result = crate::tools::definitions::remove(&args, &conn);
+    Json(json!({"ok": result.ok, "data": result.data, "error": result.error}))
+}
+
 #[derive(Deserialize)]
 pub struct CreateTeamBody {
     pub name: String,

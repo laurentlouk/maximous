@@ -173,11 +173,15 @@ async function loadTeams() {
         var modelKey = (d.model || '').toLowerCase().replace(/[^a-z]/g, '');
         var modelBadge = d.model ? badge(escapeHtml(d.model), modelKey) : '-';
         return '<tr>' +
-            '<td title="' + escapeHtml(d.id) + '">' + escapeHtml(d.id).substring(0, 8) + '...</td>' +
+            '<td title="' + escapeHtml(d.id) + '">' + escapeHtml(d.id) + '</td>' +
             '<td>' + escapeHtml(d.name || '-') + '</td>' +
             '<td>' + escapeHtml(caps) + '</td>' +
             '<td>' + modelBadge + '</td>' +
             '<td title="' + escapeHtml(prompt) + '">' + escapeHtml(promptTrunc) + '</td>' +
+            '<td class="agent-actions-cell">' +
+                '<button class="btn-edit-agent" data-id="' + escapeHtml(d.id) + '" data-name="' + escapeHtml(d.name || '') + '" data-model="' + escapeHtml(d.model || 'sonnet') + '" data-capabilities="' + escapeHtml(caps) + '" data-prompt="' + escapeHtml(prompt) + '" title="Edit">&#9998;</button>' +
+                '<button class="btn-delete-agent" data-id="' + escapeHtml(d.id) + '" data-name="' + escapeHtml(d.name || d.id) + '" title="Delete">&times;</button>' +
+            '</td>' +
         '</tr>';
     }).join('');
 
@@ -224,8 +228,8 @@ async function loadTeams() {
         '<div class="section-header"><h3>Agent Definitions</h3><button class="btn-create" id="btn-new-agent">+ New Agent</button></div>' +
         '<div id="agent-form-container" class="form-container hidden"></div>' +
         '<div class="table-container" style="margin-bottom:2rem">' +
-            '<table><thead><tr><th>ID</th><th>Name</th><th>Capabilities</th><th>Model</th><th>Prompt Hint</th></tr></thead>' +
-            '<tbody>' + (defRows || '<tr><td colspan="5" class="empty">No agent definitions</td></tr>') + '</tbody></table>' +
+            '<table><thead><tr><th>ID</th><th>Name</th><th>Capabilities</th><th>Model</th><th>Prompt Hint</th><th></th></tr></thead>' +
+            '<tbody>' + (defRows || '<tr><td colspan="6" class="empty">No agent definitions</td></tr>') + '</tbody></table>' +
         '</div>' +
         '<div class="section-header"><h3>Teams</h3><button class="btn-create" id="btn-new-team">+ New Team</button></div>' +
         '<div id="team-form-container" class="form-container hidden"></div>' +
@@ -384,6 +388,86 @@ async function loadTeams() {
             }
         });
     });
+
+    // Delete agent definition
+    el.querySelectorAll('.btn-delete-agent').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+            var agentId = this.dataset.id;
+            var agentName = this.dataset.name;
+            if (!confirm('Delete agent "' + agentName + '"? It will also be removed from any teams.')) return;
+            var resp = await fetch(API + '/api/agent-definitions/' + encodeURIComponent(agentId), {
+                method: 'DELETE',
+            });
+            var result = await resp.json();
+            if (result.ok) {
+                loadTeams();
+            } else {
+                alert('Error: ' + (result.error || 'Unknown error'));
+            }
+        });
+    });
+
+    // Edit agent definition
+    el.querySelectorAll('.btn-edit-agent').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var container = document.getElementById('agent-form-container');
+            var agentId = this.dataset.id;
+            var agentName = this.dataset.name;
+            var agentModel = this.dataset.model;
+            var agentCaps = this.dataset.capabilities;
+            var agentPrompt = this.dataset.prompt;
+            setContent(container,
+                '<form id="form-edit-agent" class="create-form">' +
+                    '<div class="form-row">' +
+                        '<label>ID <input type="text" name="id" value="' + escapeHtml(agentId) + '" readonly style="opacity:0.6"></label>' +
+                        '<label>Name <input type="text" name="name" value="' + escapeHtml(agentName) + '" required></label>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<label>Model <select name="model">' +
+                            '<option value="sonnet"' + (agentModel === 'sonnet' ? ' selected' : '') + '>Sonnet</option>' +
+                            '<option value="opus"' + (agentModel === 'opus' ? ' selected' : '') + '>Opus</option>' +
+                            '<option value="haiku"' + (agentModel === 'haiku' ? ' selected' : '') + '>Haiku</option>' +
+                        '</select></label>' +
+                        '<label>Capabilities <input type="text" name="capabilities" value="' + escapeHtml(agentCaps) + '" placeholder="comma-separated"></label>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<label class="full-width">Prompt Hint <textarea name="prompt_hint" rows="3">' + escapeHtml(agentPrompt) + '</textarea></label>' +
+                    '</div>' +
+                    '<div class="form-actions">' +
+                        '<button type="submit" class="btn-submit">Save Changes</button>' +
+                        '<button type="button" class="btn-cancel" id="cancel-edit-agent">Cancel</button>' +
+                    '</div>' +
+                '</form>');
+            container.classList.remove('hidden');
+            document.getElementById('cancel-edit-agent').addEventListener('click', function() {
+                container.classList.add('hidden');
+            });
+            document.getElementById('form-edit-agent').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                var f = e.target;
+                var caps = f.capabilities.value.trim();
+                var body = {
+                    id: agentId,
+                    name: f.name.value.trim(),
+                    model: f.model.value,
+                    capabilities: caps ? caps.split(',').map(function(s) { return s.trim(); }) : [],
+                    prompt_hint: f.prompt_hint.value.trim(),
+                };
+                var resp = await fetch(API + '/api/agent-definitions/' + encodeURIComponent(agentId), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                var result = await resp.json();
+                if (result.ok) {
+                    container.classList.add('hidden');
+                    loadTeams();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            });
+        });
+    });
 }
 
 async function loadTickets() {
@@ -454,16 +538,17 @@ async function loadTickets() {
         });
     }
 
+    var activeSource = localStorage.getItem('maximous-ticket-source') || 'linear';
+
     setContent(el,
         '<div class="section-header"><h2>Tickets</h2><button class="btn-create" id="btn-refresh-tickets">Refresh</button></div>' +
         '<div class="source-toggle" id="ticket-source-toggle">' +
-            '<button class="source-btn active" data-source="linear">Linear</button>' +
-            '<button class="source-btn" data-source="jira">Jira</button>' +
+            '<button class="source-btn' + (activeSource === 'linear' ? ' active' : '') + '" data-source="linear">Linear</button>' +
+            '<button class="source-btn' + (activeSource === 'jira' ? ' active' : '') + '" data-source="jira">Jira</button>' +
         '</div>' +
         '<div class="tickets-table-container"></div>');
 
-    var activeSource = 'linear';
-    await renderTickets('/api/tickets?source=linear');
+    await renderTickets('/api/tickets?source=' + activeSource);
 
     document.getElementById('btn-refresh-tickets').addEventListener('click', function() {
         renderTickets('/api/tickets?source=' + activeSource);
@@ -474,6 +559,7 @@ async function loadTickets() {
             el.querySelectorAll('#ticket-source-toggle .source-btn').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
             activeSource = btn.dataset.source;
+            localStorage.setItem('maximous-ticket-source', activeSource);
             renderTickets('/api/tickets?source=' + activeSource);
         });
     });

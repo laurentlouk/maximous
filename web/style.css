@@ -387,6 +387,16 @@ td.empty {
 .add-member-row button { background: var(--accent); color: #000; border: none; border-radius: 4px; padding: 0.35rem 0.75rem; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
 .add-member-row button:hover { opacity: 0.85; }
 
+/* Agent action buttons */
+.agent-actions-cell { white-space: nowrap; }
+.btn-edit-agent, .btn-delete-agent {
+    background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; line-height: 1;
+}
+.btn-edit-agent { color: var(--text-muted); }
+.btn-edit-agent:hover { color: var(--accent); background: rgba(79, 195, 247, 0.1); }
+.btn-delete-agent { color: var(--text-muted); }
+.btn-delete-agent:hover { color: var(--error); background: rgba(239, 83, 80, 0.1); }
+
 /* Launch controls */
 .launch-cell { display: flex; gap: 0.35rem; align-items: center; }
 .launch-cell select, .launch-team-select { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 0.25rem 0.4rem; font-size: 0.75rem; }
